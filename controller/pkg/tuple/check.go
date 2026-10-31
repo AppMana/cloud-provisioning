@@ -333,6 +333,14 @@ func ParseCaliVethMTUs(ipLinkOutput string) map[string]int {
 	return site.ParseCaliVethMTUs(ipLinkOutput)
 }
 
+// ReconcileGitOpsManifestFiles inspects YAML manifest files or directories on
+// disk (e.g. a Flux or ArgoCD GitOps repository checkout) and automatically
+// remediates NginxProxy hostPort Recreate patches and HelmRelease/DaemonSet
+// cloud-worker exclusions.
+func ReconcileGitOpsManifestFiles(paths []string, dryRun bool) ([]string, error) {
+	return site.ReconcileGitOpsManifestFiles(paths, dryRun)
+}
+
 func checkCalicoMTU(ctx context.Context, c client.Reader, parsedTuple Tuple, tunnelMTU int, nodeVethMTUs map[string]map[string]int) CheckResult {
 	var ds appsv1.DaemonSet
 	if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: LinuxDaemonSetName}, &ds); err != nil {
@@ -638,6 +646,7 @@ func checkSiteCNIExclusion(ctx context.Context, c client.Reader, network cni.Net
 		}
 	}
 	var wildcardWarnings []string
+	wildcardWarnings = append(wildcardWarnings, site.CheckGitOpsDaemonSetExclusion(ctx, c, &ds, platform.RoleLabel, platform.RoleValue)...)
 	var allDS appsv1.DaemonSetList
 	if err := c.List(ctx, &allDS); err == nil {
 		for i := range allDS.Items {
@@ -645,11 +654,15 @@ func checkSiteCNIExclusion(ctx context.Context, c client.Reader, network cni.Net
 			if item.Namespace == "kube-system" || item.Labels[platform.ComponentLabel] != "" {
 				continue
 			}
-			if daemonSetToleratesAllTaints(item) && !daemonSetExcludesCloudRole(item) {
-				wildcardWarnings = append(wildcardWarnings, fmt.Sprintf(
-					"DaemonSet %s/%s has a wildcard taint toleration (operator=Exists) without excluding %s=%s; it will schedule onto remote WAN cloud workers unless excluded (run 'platform-tuple fix')",
-					item.Namespace, item.Name, platform.RoleLabel, platform.RoleValue,
-				))
+			if daemonSetToleratesAllTaints(item) {
+				if !daemonSetExcludesCloudRole(item) {
+					wildcardWarnings = append(wildcardWarnings, fmt.Sprintf(
+						"DaemonSet %s/%s has a wildcard taint toleration (operator=Exists) without excluding %s=%s; it will schedule onto remote WAN cloud workers unless excluded (run 'platform-tuple fix')",
+						item.Namespace, item.Name, platform.RoleLabel, platform.RoleValue,
+					))
+				} else {
+					wildcardWarnings = append(wildcardWarnings, site.CheckGitOpsDaemonSetExclusion(ctx, c, item, platform.RoleLabel, platform.RoleValue)...)
+				}
 			}
 		}
 	}
@@ -1169,6 +1182,17 @@ func checkManifests(files [][]byte, parsedTuple Tuple) CheckResult {
 				if w := inspectNginxProxyHostPort(u); w != "" {
 					warnings = append(warnings, w)
 				}
+			case "HelmRelease":
+				chartName, _, _ := unstructured.NestedString(u.Object, "spec", "chart", "spec", "chart")
+				if chartName == "spegel" || u.GetName() == "spegel" {
+					rawSpec, _ := json.Marshal(u.Object["spec"])
+					if !strings.Contains(string(rawSpec), platform.RoleValue) {
+						warnings = append(warnings, fmt.Sprintf(
+							"HelmRelease %s/%s (chart=%s) does not exclude %s=%s in spec.values.affinity or spec.postRenderers; spegel tolerates all taints and will schedule onto remote WAN cloud workers",
+							u.GetNamespace(), u.GetName(), chartName, platform.RoleLabel, platform.RoleValue,
+						))
+					}
+				}
 			}
 		}
 	}
@@ -1181,12 +1205,30 @@ func checkManifests(files [][]byte, parsedTuple Tuple) CheckResult {
 }
 
 func checkCloudWorkerWorkloads(ctx context.Context, c client.Reader) (CheckResult, bool) {
+	var warnings []string
+	var inspectedCount int
+
+	npList := &unstructured.UnstructuredList{}
+	npList.SetGroupVersionKind(schema.GroupVersionKind{Group: "gateway.nginx.org", Version: "v1alpha2", Kind: "NginxProxyList"})
+	if err := c.List(ctx, npList); err == nil {
+		for i := range npList.Items {
+			np := &npList.Items[i]
+			hostPorts, found, _ := unstructured.NestedSlice(np.Object, "spec", "kubernetes", "deployment", "container", "hostPorts")
+			if !found || len(hostPorts) == 0 {
+				continue
+			}
+			if w := inspectNginxProxyHostPort(np); w != "" {
+				warnings = append(warnings, w)
+			} else {
+				warnings = append(warnings, site.CheckGitOpsWorkloadRecreate(ctx, c, np, "NginxProxy", "/spec/kubernetes/deployment/patches")...)
+			}
+		}
+	}
+
 	var deps appsv1.DeploymentList
 	if err := c.List(ctx, &deps); err != nil {
 		return CheckResult{}, false
 	}
-	var warnings []string
-	var inspectedCount int
 	for i := range deps.Items {
 		dep := &deps.Items[i]
 		if !targetsCloudWorkersOrSingleNode(dep) {
@@ -1195,6 +1237,8 @@ func checkCloudWorkerWorkloads(ctx context.Context, c client.Reader) (CheckResul
 		inspectedCount++
 		if w := inspectSingleNodeHostPortDeployment(dep); w != "" {
 			warnings = append(warnings, w)
+		} else if len(dep.OwnerReferences) == 0 && deploymentHasHostPort(dep) {
+			warnings = append(warnings, site.CheckGitOpsWorkloadRecreate(ctx, c, dep, "Deployment", "/spec/strategy")...)
 		}
 	}
 	if inspectedCount == 0 && len(warnings) == 0 {
@@ -1206,6 +1250,17 @@ func checkCloudWorkerWorkloads(ctx context.Context, c client.Reader) (CheckResul
 		Detail:   fmt.Sprintf("inspected %d single-node/cloud-worker Deployment(s)", inspectedCount),
 		Warnings: warnings,
 	}, true
+}
+
+func deploymentHasHostPort(dep *appsv1.Deployment) bool {
+	for _, container := range dep.Spec.Template.Spec.Containers {
+		for _, p := range container.Ports {
+			if p.HostPort > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func targetsCloudWorkersOrSingleNode(dep *appsv1.Deployment) bool {

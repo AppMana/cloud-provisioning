@@ -125,10 +125,27 @@ rules:
     verbs: ["create", "delete"]
   {{- end }}
   {{- if .Values.siteCNI.exclusion }}
-  # A Tigera operator renders calico-node from its Installation.
+  # A Tigera operator renders calico-node from its Installation, and GitOps
+  # controllers (Flux HelmRelease/Kustomization, ArgoCD Application) reconcile
+  # managed DaemonSets and single-node gateway workloads from their parent CRs.
   - apiGroups: ["operator.tigera.io"]
     resources: ["installations"]
     verbs: ["get", "patch"]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: ["helmreleases"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: ["kustomizations"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["gateway.nginx.org"]
+    resources: ["nginxproxies"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["crd.projectcalico.org"]
+    resources: ["ipamconfigs"]
+    verbs: ["get", "list", "create", "patch"]
   {{- end }}
   # The claim CRD itself.
   - apiGroups: ["cloud-provisioning.appmana.com"]

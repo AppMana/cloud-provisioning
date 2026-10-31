@@ -48,6 +48,8 @@ type ReconcileReport struct {
 	IPAMConfigPatched     bool     `json:"ipamConfigPatched,omitempty"`
 	ExclusionsPatched     bool     `json:"exclusionsPatched,omitempty"`
 	WorkloadsPatched      bool     `json:"workloadsPatched,omitempty"`
+	GitOpsPatched         bool     `json:"gitOpsPatched,omitempty"`
+	ManifestFilesPatched  bool     `json:"manifestFilesPatched,omitempty"`
 	VethsClamped          int      `json:"vethsClamped,omitempty"`
 	Changes               []string `json:"changes,omitempty"`
 }
@@ -311,6 +313,12 @@ func ReconcileCalicoSite(ctx context.Context, c client.Client, r client.Reader, 
 			}
 			report.Changes = append(report.Changes, changes...)
 		}
+		if gitopsChanges, gitopsErr := EnsureGitOpsDaemonSetExclusion(ctx, c, r, patched, cniReqs); gitopsErr != nil {
+			return nil, gitopsErr
+		} else if len(gitopsChanges) > 0 {
+			report.GitOpsPatched = true
+			report.Changes = append(report.Changes, gitopsChanges...)
+		}
 	}
 
 	if ipamChanged, ipamChanges, ipamErr := reconcileIPAMConfigDefault(ctx, c, r); ipamErr != nil {
@@ -383,14 +391,26 @@ func ReconcileCalicoSite(ctx context.Context, c client.Client, r client.Reader, 
 	if exclChanges, exclErr := reconcileWildcardDaemonSets(ctx, c, r); exclErr != nil {
 		return nil, exclErr
 	} else if len(exclChanges) > 0 {
-		report.ExclusionsPatched = true
+		for _, ch := range exclChanges {
+			if strings.HasPrefix(ch, "Flux ") || strings.HasPrefix(ch, "ArgoCD ") {
+				report.GitOpsPatched = true
+			} else {
+				report.ExclusionsPatched = true
+			}
+		}
 		report.Changes = append(report.Changes, exclChanges...)
 	}
 
 	if wlChanges, wlErr := reconcileSingleNodeHostPortWorkloads(ctx, c, r); wlErr != nil {
 		return nil, wlErr
 	} else if len(wlChanges) > 0 {
-		report.WorkloadsPatched = true
+		for _, ch := range wlChanges {
+			if strings.HasPrefix(ch, "Flux ") || strings.HasPrefix(ch, "ArgoCD ") {
+				report.GitOpsPatched = true
+			} else {
+				report.WorkloadsPatched = true
+			}
+		}
 		report.Changes = append(report.Changes, wlChanges...)
 	}
 
@@ -453,17 +473,24 @@ func reconcileWildcardDaemonSets(ctx context.Context, c client.Client, r client.
 				break
 			}
 		}
-		if !toleratesAll || excludes(&ds.Spec.Template.Spec, reqs) {
+		if !toleratesAll {
 			continue
 		}
-		patched := ds.DeepCopy()
-		exclude(&patched.Spec.Template.Spec, reqs)
-		if c != nil {
-			if err := c.Patch(ctx, patched, client.MergeFromWithOptions(ds, client.MergeFromWithOptimisticLock{})); err != nil {
-				return nil, fmt.Errorf("excluding cloud-worker from DaemonSet %s/%s: %w", ds.Namespace, ds.Name, err)
+		if !excludes(&ds.Spec.Template.Spec, reqs) {
+			patched := ds.DeepCopy()
+			exclude(&patched.Spec.Template.Spec, reqs)
+			if c != nil {
+				if err := c.Patch(ctx, patched, client.MergeFromWithOptions(ds, client.MergeFromWithOptimisticLock{})); err != nil {
+					return nil, fmt.Errorf("excluding cloud-worker from DaemonSet %s/%s: %w", ds.Namespace, ds.Name, err)
+				}
 			}
+			changes = append(changes, fmt.Sprintf("DaemonSet %s/%s nodeAffinity exclude cloud-worker", ds.Namespace, ds.Name))
 		}
-		changes = append(changes, fmt.Sprintf("DaemonSet %s/%s nodeAffinity exclude cloud-worker", ds.Namespace, ds.Name))
+		if gitopsChanges, err := EnsureGitOpsDaemonSetExclusion(ctx, c, r, ds, reqs); err != nil {
+			return nil, err
+		} else if len(gitopsChanges) > 0 {
+			changes = append(changes, gitopsChanges...)
+		}
 	}
 	return changes, nil
 }
@@ -490,31 +517,36 @@ func reconcileSingleNodeHostPortWorkloads(ctx context.Context, c client.Client, 
 					break
 				}
 			}
-			if hasRecreate {
-				continue
-			}
-			patched := np.DeepCopy()
-			recreatePatch := map[string]interface{}{
-				"type": "StrategicMerge",
-				"value": map[string]interface{}{
-					"spec": map[string]interface{}{
-						"strategy": map[string]interface{}{
-							"type":          "Recreate",
-							"rollingUpdate": nil,
+			if !hasRecreate {
+				patched := np.DeepCopy()
+				recreatePatch := map[string]interface{}{
+					"type": "StrategicMerge",
+					"value": map[string]interface{}{
+						"spec": map[string]interface{}{
+							"strategy": map[string]interface{}{
+								"type":          "Recreate",
+								"rollingUpdate": nil,
+							},
 						},
 					},
-				},
-			}
-			patches = append(patches, recreatePatch)
-			if err := unstructured.SetNestedSlice(patched.Object, patches, "spec", "kubernetes", "deployment", "patches"); err != nil {
-				return nil, err
-			}
-			if c != nil {
-				if err := c.Patch(ctx, patched, client.MergeFromWithOptions(np, client.MergeFromWithOptimisticLock{})); err != nil {
-					return nil, fmt.Errorf("patching NginxProxy %s/%s: %w", np.GetNamespace(), np.GetName(), err)
 				}
+				patches = append(patches, recreatePatch)
+				if err := unstructured.SetNestedSlice(patched.Object, patches, "spec", "kubernetes", "deployment", "patches"); err != nil {
+					return nil, err
+				}
+				if c != nil {
+					if err := c.Patch(ctx, patched, client.MergeFromWithOptions(np, client.MergeFromWithOptimisticLock{})); err != nil {
+						return nil, fmt.Errorf("patching NginxProxy %s/%s: %w", np.GetNamespace(), np.GetName(), err)
+					}
+				}
+				changes = append(changes, fmt.Sprintf("NginxProxy %s/%s added StrategicMerge deployment patch strategy.type=Recreate", np.GetNamespace(), np.GetName()))
 			}
-			changes = append(changes, fmt.Sprintf("NginxProxy %s/%s added StrategicMerge deployment patch strategy.type=Recreate", np.GetNamespace(), np.GetName()))
+			npPatchYAML := fmt.Sprintf("apiVersion: gateway.nginx.org/v1alpha2\nkind: NginxProxy\nmetadata:\n  name: %s\n  namespace: %s\nspec:\n  kubernetes:\n    deployment:\n      patches:\n        - type: StrategicMerge\n          value:\n            spec:\n              strategy:\n                type: Recreate\n                rollingUpdate: null\n", np.GetName(), np.GetNamespace())
+			if gitopsChanges, err := EnsureGitOpsWorkloadRecreate(ctx, c, r, np, "gateway.nginx.org", "v1alpha2", "NginxProxy", "/spec/kubernetes/deployment/patches", npPatchYAML); err != nil {
+				return nil, err
+			} else if len(gitopsChanges) > 0 {
+				changes = append(changes, gitopsChanges...)
+			}
 		}
 	}
 
@@ -525,6 +557,9 @@ func reconcileSingleNodeHostPortWorkloads(ctx context.Context, c client.Client, 
 	}
 	for i := range deps.Items {
 		dep := &deps.Items[i]
+		if len(dep.OwnerReferences) > 0 {
+			// Owned by a higher-level controller (e.g. NginxGateway); only patch strategy if still RollingUpdate.
+		}
 		singleNode := dep.Spec.Template.Spec.NodeSelector[platform.RoleLabel] == platform.RoleValue ||
 			dep.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] != ""
 		if !singleNode {
@@ -547,26 +582,35 @@ func reconcileSingleNodeHostPortWorkloads(ctx context.Context, c client.Client, 
 				}
 			}
 		}
-		if !hasHostPort || dep.Spec.Strategy.Type == appsv1.RecreateDeploymentStrategyType {
+		if !hasHostPort {
 			continue
 		}
-		if dep.Spec.Strategy.RollingUpdate != nil && dep.Spec.Strategy.RollingUpdate.MaxSurge != nil {
+		alreadyRecreate := dep.Spec.Strategy.Type == appsv1.RecreateDeploymentStrategyType
+		if !alreadyRecreate && dep.Spec.Strategy.RollingUpdate != nil && dep.Spec.Strategy.RollingUpdate.MaxSurge != nil {
 			ms := dep.Spec.Strategy.RollingUpdate.MaxSurge.String()
 			if ms == "0" || ms == "0%" {
-				continue
+				alreadyRecreate = true
 			}
 		}
-		patched := dep.DeepCopy()
-		patched.Spec.Strategy = appsv1.DeploymentStrategy{
-			Type:          appsv1.RecreateDeploymentStrategyType,
-			RollingUpdate: nil,
-		}
-		if c != nil {
-			if err := c.Patch(ctx, patched, client.MergeFromWithOptions(dep, client.MergeFromWithOptimisticLock{})); err != nil {
-				return nil, fmt.Errorf("patching Deployment %s/%s strategy: %w", dep.Namespace, dep.Name, err)
+		if !alreadyRecreate {
+			patched := dep.DeepCopy()
+			patched.Spec.Strategy = appsv1.DeploymentStrategy{
+				Type:          appsv1.RecreateDeploymentStrategyType,
+				RollingUpdate: nil,
 			}
+			if c != nil {
+				if err := c.Patch(ctx, patched, client.MergeFromWithOptions(dep, client.MergeFromWithOptimisticLock{})); err != nil {
+					return nil, fmt.Errorf("patching Deployment %s/%s strategy: %w", dep.Namespace, dep.Name, err)
+				}
+			}
+			changes = append(changes, fmt.Sprintf("Deployment %s/%s strategy.type RollingUpdate -> Recreate", dep.Namespace, dep.Name))
 		}
-		changes = append(changes, fmt.Sprintf("Deployment %s/%s strategy.type RollingUpdate -> Recreate", dep.Namespace, dep.Name))
+		depPatchYAML := fmt.Sprintf("apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: %s\n  namespace: %s\nspec:\n  strategy:\n    type: Recreate\n    rollingUpdate: null\n", dep.Name, dep.Namespace)
+		if gitopsChanges, err := EnsureGitOpsWorkloadRecreate(ctx, c, r, dep, "apps", "v1", "Deployment", "/spec/strategy", depPatchYAML); err != nil {
+			return nil, err
+		} else if len(gitopsChanges) > 0 {
+			changes = append(changes, gitopsChanges...)
+		}
 	}
 	return changes, nil
 }

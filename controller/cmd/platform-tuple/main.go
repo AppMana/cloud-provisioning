@@ -157,9 +157,15 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 			sc.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
 			sc.AddKnownTypeWithName(gvk.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
 		}
-		npGVK := schema.GroupVersionKind{Group: "gateway.nginx.org", Version: "v1alpha2", Kind: "NginxProxy"}
-		sc.AddKnownTypeWithName(npGVK, &unstructured.Unstructured{})
-		sc.AddKnownTypeWithName(npGVK.GroupVersion().WithKind("NginxProxyList"), &unstructured.UnstructuredList{})
+		for _, gvk := range []schema.GroupVersionKind{
+			{Group: "gateway.nginx.org", Version: "v1alpha2", Kind: "NginxProxy"},
+			{Group: "helm.toolkit.fluxcd.io", Version: "v2", Kind: "HelmRelease"},
+			{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Kind: "Kustomization"},
+			{Group: "argoproj.io", Version: "v1alpha1", Kind: "Application"},
+		} {
+			sc.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+			sc.AddKnownTypeWithName(gvk.GroupVersion().WithKind(gvk.Kind+"List"), &unstructured.UnstructuredList{})
+		}
 		cl, err := client.New(cfg, client.Options{Scheme: sc})
 		return cl, cfg, err
 	}
@@ -209,24 +215,37 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 		return err
 
 	case "fix":
-		cl, restCfg, err := newKubeClient()
-		if err != nil {
-			return err
+		report := &tuple.ReconcileReport{}
+		if *kubeconfig != "" || len(manifestPaths) == 0 {
+			cl, restCfg, err := newKubeClient()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(ctx, *timeout)
+			defer cancel()
+			var writer client.Client = cl
+			if *dryRun {
+				writer = nil
+			}
+			report, err = tuple.ReconcileCalicoSite(ctx, writer, cl, winOpts.MTU)
+			if err != nil {
+				return err
+			}
+			if report.EffectiveMTU >= 1280 && restCfg != nil {
+				clamped, vethChanges := clampCalicoNodeVeths(ctx, cl, restCfg, report.EffectiveMTU, *dryRun)
+				report.VethsClamped += clamped
+				report.Changes = append(report.Changes, vethChanges...)
+			}
 		}
-		ctx, cancel := context.WithTimeout(ctx, *timeout)
-		defer cancel()
-		var writer client.Client = cl
-		if *dryRun {
-			writer = nil
-		}
-		report, err := tuple.ReconcileCalicoSite(ctx, writer, cl, winOpts.MTU)
-		if err != nil {
-			return err
-		}
-		if report.EffectiveMTU >= 1280 && restCfg != nil {
-			clamped, vethChanges := clampCalicoNodeVeths(ctx, cl, restCfg, report.EffectiveMTU, *dryRun)
-			report.VethsClamped += clamped
-			report.Changes = append(report.Changes, vethChanges...)
+		if len(manifestPaths) > 0 {
+			fileChanges, err := tuple.ReconcileGitOpsManifestFiles(manifestPaths, *dryRun)
+			if err != nil {
+				return err
+			}
+			if len(fileChanges) > 0 {
+				report.ManifestFilesPatched = true
+				report.Changes = append(report.Changes, fileChanges...)
+			}
 		}
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")

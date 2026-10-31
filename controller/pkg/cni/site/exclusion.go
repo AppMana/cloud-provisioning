@@ -254,7 +254,13 @@ func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
 // rendered it, which brings this DaemonSet back to the reconciler.
 func (e *Excluder) ensureExcluded(ctx context.Context, ds *appsv1.DaemonSet) (bool, error) {
 	reqs := e.requirements(ds)
-	if len(reqs) == 0 || excludes(&ds.Spec.Template.Spec, reqs) {
+	if len(reqs) == 0 {
+		return true, nil
+	}
+	if excludes(&ds.Spec.Template.Spec, reqs) {
+		if _, err := EnsureGitOpsDaemonSetExclusion(ctx, e.Client, e.Reader, ds, reqs); err != nil {
+			return false, err
+		}
 		return true, nil
 	}
 	key := client.ObjectKeyFromObject(ds)
@@ -275,6 +281,9 @@ func (e *Excluder) ensureExcluded(ctx context.Context, ds *appsv1.DaemonSet) (bo
 			return false, fmt.Errorf("excluding cloud nodes from %s: %w", key, err)
 		}
 		*ds = *patched
+		if _, err := EnsureGitOpsDaemonSetExclusion(ctx, e.Client, e.Reader, ds, reqs); err != nil {
+			return false, err
+		}
 	}
 	e.mu.Lock()
 	if e.applied == nil {

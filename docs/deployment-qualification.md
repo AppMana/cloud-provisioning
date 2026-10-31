@@ -397,6 +397,17 @@ from the complete forwarding path (for example, a 1420-byte tunnel budget with
 50 bytes of additional CNI encapsulation leaves a 1370-byte pod budget). Apply
 it through the CNI's owning configuration on every controller that can reconcile
 the network, then verify installed configuration and fresh pod interfaces.
+`platform-tuple check`, `endpoint-controller check`, and `acceptance preconditions --tuple=...`
+inspect both `k0s.yaml` (`spec.network.calico.mtu`) and live cluster state
+(`kube-system/calico-node` `CNI_NETWORK_CONFIG` `mtu`, `FELIX_*MTU`,
+`calico-windows-config-actual` `CNI_MTU` / `veth_mtu`, `IPAMConfig/default`
+`strictAffinity`, site CNI / wildcard-toleration DaemonSet `nodeAffinity`
+exclusion, and `hostPort` `Recreate` rollout strategies). Running `platform-tuple fix`
+(or the live `endpoint-controller` reconciler) automatically aligns those
+settings, clamps existing live host `cali*` veth and container `eth0` MTUs
+in-place without pod restarts, and propagates DaemonSet exclusions and rollout
+patches to owning Flux `HelmRelease`, Flux `Kustomization`, and Argo CD
+`Application` resources.
 
 Apply the same path budget to AWS VPC CNI pods. Its `POD_MTU` is independent of
 Calico's setting and of `AWS_VPC_ENI_MTU`; changing the site CNI does not change

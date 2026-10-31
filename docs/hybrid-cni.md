@@ -18,15 +18,43 @@ default): every site network DaemonSet (those mounting `/etc/cni/net.d` or
 `/opt/cni/bin`, `calico-node-windows`, and any named in `siteCNI.daemonSets`)
 gets the required node-affinity requirement
 `cloud-provisioning.appmana.com/cni NotIn [aws-vpc]` in every required term.
+In addition, non-`kube-system` DaemonSets that declare a wildcard taint
+toleration (`operator: Exists` with an empty `key`, such as node-local OCI
+registry mirrors like `spegel`) automatically receive
+`cloud-provisioning.appmana.com/role NotIn [cloud-worker]` so LAN-only daemons
+do not schedule onto WAN/cloud workers.
 CNI DaemonSets tolerate every taint, so the cloud worker taint does not keep
 them off. A Tigera operator install is changed through its `Installation`
-override. Site nodes carry no such label and still match. If another writer
+override. When a DaemonSet or `Deployment` is managed by **Flux CD** (`HelmRelease`
+or `Kustomization`) or **Argo CD** (`Application`), both `endpoint-controller`
+and `platform-tuple fix` propagate the exclusion or rollout strategy patch
+upstream to the owning GitOps custom resource (`HelmRelease.spec.postRenderers`
+kustomize strategic-merge patch, `Kustomization.spec.patches`, or Argo CD
+`Application.spec.ignoreDifferences`) so GitOps controllers enforce rather than
+revert the remediation. Site nodes carry no such label and still match. If another writer
 removes the requirement more than three times in ten minutes the controller
 stops restoring it and reports the conflict on new claims. A claim for an AWS
 VPC CNI node creates no machine until every site network DaemonSet excludes
 it; OVN-Kubernetes and networks with no DaemonSet (k3s embedded flannel) are
 refused. Without a Calico agent on AWS nodes, Calico IPAM never allocates
 there, so the site's pools need no node selector.
+
+For Calico BGP sites, the controller and `platform-tuple fix` also reconcile:
+- **Calico MTU alignment (`calico-mtu`)**: Ensures `kube-system/calico-node`
+  `install-cni` `CNI_NETWORK_CONFIG` `mtu`, `FELIX_IPINIPMTU`, `FELIX_VXLANMTU`,
+  `FELIX_WIREGUARDMTU`, and (when present) `kube-system/calico-windows-config-actual`
+  `CNI_MTU` / `veth_mtu` match the site/tunnel path budget, and clamps any live
+  host `cali*` veth and container `eth0` interfaces in-place via `calico-node`
+  exec without restarting running pods.
+- **Strict IPAM block affinity (`calico-ipam`)**: Sets `spec.strictAffinity: true`
+  and `spec.autoAllocateBlocks: true` on `IPAMConfig/default` (`crd.projectcalico.org/v1`)
+  so unencapsulated BGP nodes never borrow single `/32` or `/128` pod addresses
+  from another node's IPAM block.
+- **Single-node / cloud-worker `hostPort` rollout safety (`cloud-worker-workloads`)**:
+  Patches `NginxProxy` CRs (`gateway.nginx.org/v1alpha2`) and single-node or
+  `cloud-worker` `Deployment`s that bind `hostPort`s to `spec.strategy.type: Recreate`
+  (and propagates the patch to any owning Flux `Kustomization`, `HelmRelease`, or
+  Argo CD `Application`).
 The product applies the AWS Linux `aws-node` DaemonSet itself, scheduled only
 on AWS VPC CNI Linux nodes (see [Linux AWS VPC CNI](#linux-aws-vpc-cni)). Windows
 requires its native VPC CNI binaries/configuration and Windows IPAM controller;

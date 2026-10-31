@@ -63,6 +63,13 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	mode := fs.String("mode", "check", "check (evaluate platform tuple), fix (reconcile live Calico MTU and Windows BGP settings), render (Windows BGP manifest), k0s-network (k0s spec fragment), or validate-k0s-config")
 	tupleExpr := fs.String("tuple", "k0s + calico,bgp + aws", "platform tuple expression (e.g. \"k0s + calico,bgp + aws\")")
 	k0sConfigPath := fs.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
+	valuesPath := fs.String("values", "", "optional Helm values.yaml path to inspect for cloud-provisioning configuration")
+	var manifestPaths []string
+	fs.Func("manifests", "optional Kubernetes manifest YAML file or directory to inspect (repeatable or comma-separated)", func(value string) error {
+		manifestPaths = append(manifestPaths, value)
+		return nil
+	})
+	format := fs.String("format", "json", "output format for check mode: json or text")
 	kubeconfig := fs.String("kubeconfig", "", "optional kubeconfig path for live cluster checks or reconciliation")
 	kubecontext := fs.String("context", "", "optional kubeconfig context override")
 	dryRun := fs.Bool("dry-run", false, "report live Calico/Windows BGP changes without persisting them (--mode=fix)")
@@ -71,16 +78,39 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	tunnelIPv6 := fs.String("tunnel-ipv6", "fd00:10:100::/96", "WireGuard IPv6 tunnel range")
 	requireDualStack := fs.Bool("require-dual-stack", false, "require IPv4 + IPv6 dual-stack pod networking")
 	requireWindowsBGP := fs.Bool("require-windows-bgp", false, "require Windows BGP ConfigMap/DaemonSet/IPAMConfig even before a Windows node joins")
+	strictBGPPeers := fs.Bool("strict-bgp-peers", false, "require BGPPeers to explicitly exclude cloud-worker even when cloudCNI=aws-vpc")
 	podCIDR := fs.String("pod-cidr", "", "optional IPv4 pod CIDR for k0s-network mode")
 	ipv6PodCIDR := fs.String("ipv6-pod-cidr", "", "optional IPv6 pod CIDR for k0s-network mode")
 	ipv6ServiceCIDR := fs.String("ipv6-service-cidr", "", "optional IPv6 service CIDR for k0s-network mode")
 	timeout := fs.Duration("timeout", 30*time.Second, "API request timeout")
 
+	isVerb := func(v string) bool {
+		switch v {
+		case "check", "fix", "render", "k0s-network", "validate-k0s-config":
+			return true
+		default:
+			return false
+		}
+	}
+	var positionalVerb string
+	if len(args) > 0 && isVerb(args[0]) {
+		positionalVerb = args[0]
+		args = args[1:]
+	}
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if fs.NArg() > 0 && positionalVerb == "" && isVerb(fs.Arg(0)) {
+		positionalVerb = fs.Arg(0)
+		if err := fs.Parse(fs.Args()[1:]); err != nil {
+			return err
+		}
+	}
 	if fs.NArg() != 0 {
-		return fmt.Errorf("unexpected positional arguments")
+		return fmt.Errorf("unexpected positional arguments: %v", fs.Args())
+	}
+	if positionalVerb != "" {
+		*mode = positionalVerb
 	}
 
 	var k0sBytes []byte
@@ -90,6 +120,18 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 			return err
 		}
 		k0sBytes = raw
+	}
+	var valuesBytes []byte
+	if *valuesPath != "" {
+		raw, err := os.ReadFile(*valuesPath)
+		if err != nil {
+			return err
+		}
+		valuesBytes = raw
+	}
+	manifestsBytes, err := tuple.LoadManifestBytes(manifestPaths)
+	if err != nil {
+		return err
 	}
 
 	newKubeClient := func() (client.Client, error) {
@@ -187,21 +229,34 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 		ctx, cancel := context.WithTimeout(ctx, *timeout)
 		defer cancel()
 		results, err := tuple.Evaluate(ctx, reader, tuple.CheckOptions{
-			Tuple:             *tupleExpr,
-			K0sConfig:         k0sBytes,
-			TunnelMTU:         *tunnelMTU,
-			TunnelIPv4:        *tunnelIPv4,
-			TunnelIPv6:        *tunnelIPv6,
-			RequireDualStack:  *requireDualStack,
-			RequireWindowsBGP: *requireWindowsBGP,
+			Tuple:              *tupleExpr,
+			K0sConfig:          k0sBytes,
+			ValuesYAML:         valuesBytes,
+			ManifestsYAML:      manifestsBytes,
+			TunnelMTU:          *tunnelMTU,
+			TunnelIPv4:         *tunnelIPv4,
+			TunnelIPv6:         *tunnelIPv6,
+			RequireDualStack:   *requireDualStack,
+			RequireWindowsBGP:  *requireWindowsBGP,
+			StrictBGPPeerScope: *strictBGPPeers,
 		})
 		if err != nil {
 			return err
 		}
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(results); err != nil {
-			return err
+		report := tuple.FormatReport(results)
+		if strings.EqualFold(strings.TrimSpace(*format), "text") {
+			if _, err := io.WriteString(out, report); err != nil {
+				return err
+			}
+		} else {
+			if diagnostics != nil {
+				_, _ = io.WriteString(diagnostics, report)
+			}
+			enc := json.NewEncoder(out)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(results); err != nil {
+				return err
+			}
 		}
 		if !tuple.Passed(results) {
 			return fmt.Errorf("platform tuple %q failed one or more health/environment checks", *tupleExpr)

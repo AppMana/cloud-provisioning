@@ -471,3 +471,51 @@ func ValidateK0sCalicoConfig(raw []byte) error {
 	}
 	return nil
 }
+
+// InspectK0sCalicoConfig runs ValidateK0sCalicoConfig and also returns
+// environment warnings for the selected platform tuple and WireGuard tunnel MTU.
+func InspectK0sCalicoConfig(raw []byte, parsedTuple Tuple, tunnelMTU int) ([]string, error) {
+	if err := ValidateK0sCalicoConfig(raw); err != nil {
+		return nil, err
+	}
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("parse k0s config: %w", err)
+	}
+	spec, ok, _ := unstructured.NestedMap(doc, "spec", "k0s", "config", "spec")
+	if !ok {
+		spec, _, _ = unstructured.NestedMap(doc, "spec")
+	}
+	var cniMTU int
+	if mtuVal, found, _ := unstructured.NestedFieldNoCopy(spec, "network", "calico", "mtu"); found {
+		switch v := mtuVal.(type) {
+		case int64:
+			cniMTU = int(v)
+		case float64:
+			cniMTU = int(v)
+		case int:
+			cniMTU = v
+		}
+	}
+	if tunnelMTU <= 0 {
+		tunnelMTU = 1420
+	}
+	if cniMTU > tunnelMTU && parsedTuple.CloudCNI == "site" {
+		return nil, fmt.Errorf("spec.network.calico.mtu (%d) exceeds WireGuard tunnel MTU (%d) for cloudCNI=site", cniMTU, tunnelMTU)
+	}
+	var warnings []string
+	if cniMTU > tunnelMTU && parsedTuple.CloudCNI == "aws-vpc" {
+		warnings = append(warnings, fmt.Sprintf(
+			"spec.network.calico.mtu=%d exceeds WireGuard tunnel MTU=%d; aws-node clamps aws-vpc cloud-worker pods to %d while site pods use %d",
+			cniMTU, tunnelMTU, tunnelMTU, cniMTU,
+		))
+	}
+	rawStr := string(raw)
+	if strings.Contains(rawStr, "vip0") && strings.Contains(rawStr, "/32") {
+		warnings = append(warnings, "k0sctl hooks configure a /32 VIP on vip0; ensure vip0 is outside the IP_AUTODETECTION_METHOD CIDR or excluded via can-reach/interface rules so Calico BIRD never binds to vip0")
+	}
+	if strings.Contains(rawStr, "tailscale0") || strings.Contains(rawStr, "mtu 4200") || strings.Contains(rawStr, "roce") {
+		warnings = append(warnings, "k0sctl config references secondary host fabrics (RoCE jumbo MTU / tailscale0); keep IP_AUTODETECTION_METHOD and IP6_AUTODETECTION_METHOD pinned to the primary site LAN CIDR")
+	}
+	return warnings, nil
+}

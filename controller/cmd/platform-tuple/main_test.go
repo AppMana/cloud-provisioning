@@ -66,4 +66,46 @@ func TestPlatformTupleCLIModes(t *testing.T) {
 	if err := run(ctx, []string{"--mode=validate-k0s-config", "--k0s-config=" + cfgFile}, &out, &diag); err != nil {
 		t.Fatalf("validate-k0s-config failed: %v", err)
 	}
+
+	// 4. Positional 'check' verb with --k0s-config, --values, and --manifests prints warnings.
+	valuesFile := filepath.Join(t.TempDir(), "values.yaml")
+	if err := os.WriteFile(valuesFile, []byte(`
+dialerBinary:
+  arm64:
+    url: "https://example.com/wg-dialer-linux-arm64"
+    sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifestFile := filepath.Join(t.TempDir(), "manifests.yaml")
+	if err := os.WriteFile(manifestFile, []byte(`
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClass
+metadata:
+  name: edge
+spec:
+  os: linux
+  region: ap-east-1
+  instanceType: t4g.small
+  rootVolumeGiB: 10
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	diag.Reset()
+	if err := run(ctx, []string{
+		"check",
+		"--tuple=k0s + calico,bgp + aws",
+		"--k0s-config=" + cfgFile,
+		"--values=" + valuesFile,
+		"--manifests=" + manifestFile,
+	}, &out, &diag); err != nil {
+		t.Fatalf("check verb failed: %v", err)
+	}
+	if !strings.Contains(diag.String(), "WARN") || !strings.Contains(diag.String(), "warning:") {
+		t.Fatalf("expected diagnostics to include WARN and warning lines, got:\n%s", diag.String())
+	}
+	if !strings.Contains(out.String(), `"status": "WARN"`) {
+		t.Fatalf("expected JSON output to include status=WARN, got:\n%s", out.String())
+	}
 }

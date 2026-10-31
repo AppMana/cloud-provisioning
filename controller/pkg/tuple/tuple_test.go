@@ -431,3 +431,146 @@ func TestEvaluateCatchesAutodetectionWindowsBGPAndPeerPitfalls(t *testing.T) {
 			byName(healedRes)["calico-mtu"], byName(healedRes)["windows-bgp"])
 	}
 }
+
+func TestEvaluateConfigurationAndEnvironmentWarnings(t *testing.T) {
+	ctx := context.Background()
+
+	k0sCfg := []byte(`
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+spec:
+  hosts:
+  - role: controller+worker
+    hooks:
+      apply:
+        before:
+        - ip link add vip0 type dummy && ip addr add 192.168.10.254/32 dev vip0
+        - ip link set dev roce0 mtu 4200
+  k0s:
+    config:
+      spec:
+        controllerManager:
+          extraArgs:
+            allocate-node-cidrs: "false"
+        network:
+          provider: calico
+          calico:
+            mode: bird
+            overlay: Never
+            mtu: 1500
+            envVars:
+              IP_AUTODETECTION_METHOD: cidr=192.168.10.0/24
+              FELIX_IPINIPMTU: "1500"
+              FELIX_VXLANMTU: "1500"
+              FELIX_WIREGUARDMTU: "1500"
+`)
+	valuesYAML := []byte(`
+dialerBinary:
+  version: "latest"
+  arm64:
+    url: "https://example.com/wg-dialer-linux-arm64"
+    sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+windowsBootstrap:
+  tunnelSHA256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+`)
+	manifestsYAML := []byte(`
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClass
+metadata:
+  name: ap-east-1-edge
+spec:
+  os: linux
+  cni: aws-vpc
+  region: ap-east-1
+  instanceType: t4g.small
+  rootVolumeGiB: 12
+---
+apiVersion: crd.projectcalico.org/v1
+kind: BGPPeer
+metadata:
+  name: vyos-peer
+spec:
+  peerIP: 192.168.10.1
+  asNumber: 65000
+  nodeSelector: kubernetes.io/os == 'linux'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-proxy
+  namespace: default
+spec:
+  strategy:
+    type: RollingUpdate
+  template:
+    spec:
+      nodeSelector:
+        cloud-provisioning.appmana.com/role: cloud-worker
+      containers:
+      - name: proxy
+        image: envoyproxy/envoy:v1.31.0
+        ports:
+        - containerPort: 443
+          hostPort: 443
+`)
+
+	results, err := Evaluate(ctx, nil, CheckOptions{
+		Tuple:         "k0s + calico,bgp + aws",
+		K0sConfig:     k0sCfg,
+		ValuesYAML:    valuesYAML,
+		ManifestsYAML: [][]byte{manifestsYAML},
+		TunnelMTU:     1420,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Passed(results) {
+		t.Fatalf("expected configuration checks with warnings to pass, got: %+v", results)
+	}
+	got := byName(results)
+	for _, checkName := range []string{"k0s-config", "helm-values", "manifests"} {
+		if got[checkName].EffectiveStatus() != "WARN" || len(got[checkName].Warnings) == 0 {
+			t.Fatalf("expected %s to emit WARN with warnings, got: %+v", checkName, got[checkName])
+		}
+	}
+	allWarnings := strings.Join(Warnings(results), "\n")
+	for _, wantSubstr := range []string{
+		"vip0",
+		"RoCE jumbo MTU",
+		"exceeds WireGuard tunnel MTU=1420",
+		"hardcoded dialer binary overrides",
+		"AWS opt-in region ap-east-1",
+		"rootVolumeGiB=12",
+		"BGPPeer vyos-peer",
+		"Deployment default/edge-proxy targets cloud-worker with hostPort [443]",
+	} {
+		if !strings.Contains(allWarnings, wantSubstr) {
+			t.Fatalf("expected warning containing %q in:\n%s", wantSubstr, allWarnings)
+		}
+	}
+	report := FormatReport(results)
+	if !strings.Contains(report, "WARN") || !strings.Contains(report, "warning:") {
+		t.Fatalf("expected FormatReport to include WARN and warning lines, got:\n%s", report)
+	}
+
+	// Verify Windows on ARM64 instance fails manifests check.
+	badManifest := []byte(`
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClass
+metadata:
+  name: bad-win
+spec:
+  os: windows
+  instanceType: t4g.medium
+`)
+	badRes, err := Evaluate(ctx, nil, CheckOptions{
+		Tuple:         "k0s + calico,bgp + aws",
+		ManifestsYAML: [][]byte{badManifest},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Passed(badRes) || byName(badRes)["manifests"].Pass {
+		t.Fatalf("expected Windows on ARM64 ProvisionedNodeClass to fail manifests check: %+v", badRes)
+	}
+}

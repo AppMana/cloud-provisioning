@@ -189,6 +189,14 @@ spec:
             {{- with $receivePolicy }}
             - {{ printf "--receive-preparation-policy=%s" (toJson .) | quote }}
             {{- end }}
+            {{- if .Values.dialerBinary.manifestURL }}
+            - "--join-dialer-manifest-url={{ .Values.dialerBinary.manifestURL }}"
+            {{- else if .Values.dialerBinary.version }}
+            - "--join-dialer-manifest-url={{ .Values.dialerBinary.version }}"
+            {{- end }}
+            {{- if not (kindIs "invalid" .Values.dialerBinary.preferUniversal) }}
+            - "--join-dialer-prefer-universal={{ .Values.dialerBinary.preferUniversal }}"
+            {{- end }}
             {{- with .Values.dialerBinary.arm64.url }}
             - "--join-dialer-binary-url-arm64={{ . }}"
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set: an unpinned download is a supply-chain hole" }}"

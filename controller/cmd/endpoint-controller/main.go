@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"net/url"
@@ -65,11 +66,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -2422,6 +2425,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == microk8sTokenAgentCommand {
 		os.Exit(runMicrok8sTokenAgent(os.Args[2:]))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "check" {
+		os.Exit(runPlatformTupleCheck(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	var (
 		machineSelector  string
 		secretNamespace  string
@@ -2472,6 +2478,9 @@ func main() {
 		dialerBinarySHA256ARM64   string
 		dialerBinaryURLAMD64      string
 		dialerBinarySHA256AMD64   string
+		dialerManifestPath        string
+		dialerManifestURL         string
+		dialerPreferUniversal     bool
 		cniPluginsURLARM64        string
 		cniPluginsSHA256ARM64     string
 		cniPluginsURLAMD64        string
@@ -2528,10 +2537,13 @@ func main() {
 	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the remote side")
 	flag.StringVar(&dialerListenPort, "join-dialer-listen-port", "51820", "WireGuard listen port the local dialers expect the remote peer to use")
 	flag.StringVar(&bootstrapSecretNameFormat, "join-bootstrap-secret-name-format", "%s-bootstrap", "printf format (with the Machine's name) for the bootstrap Secret's name")
-	flag.StringVar(&dialerBinaryURLARM64, "join-dialer-binary-url-arm64", "", "REQUIRED (arm64 nodes) URL cloud-init downloads the dialer binary from; nothing installs it on a stock image")
-	flag.StringVar(&dialerBinarySHA256ARM64, "join-dialer-binary-sha256-arm64", "", "REQUIRED (arm64 nodes) sha256 of that binary, verified by cloud-init before the tunnel unit starts")
-	flag.StringVar(&dialerBinaryURLAMD64, "join-dialer-binary-url-amd64", "", "URL cloud-init downloads the amd64 dialer binary from")
-	flag.StringVar(&dialerBinarySHA256AMD64, "join-dialer-binary-sha256-amd64", "", "sha256 of the amd64 binary")
+	flag.StringVar(&dialerBinaryURLARM64, "join-dialer-binary-url-arm64", "", "optional override URL cloud-init downloads the arm64 dialer binary from (defaults to the multi-platform release manifest)")
+	flag.StringVar(&dialerBinarySHA256ARM64, "join-dialer-binary-sha256-arm64", "", "optional override sha256 of the arm64 dialer binary (defaults to the multi-platform release manifest)")
+	flag.StringVar(&dialerBinaryURLAMD64, "join-dialer-binary-url-amd64", "", "optional override URL cloud-init downloads the amd64 dialer binary from (defaults to the multi-platform release manifest)")
+	flag.StringVar(&dialerBinarySHA256AMD64, "join-dialer-binary-sha256-amd64", "", "optional override sha256 of the amd64 dialer binary (defaults to the multi-platform release manifest)")
+	flag.StringVar(&dialerManifestPath, "join-dialer-manifest-path", join.DefaultDialerManifestPath, "path to the multi-platform dialer release manifest baked into the image")
+	flag.StringVar(&dialerManifestURL, "join-dialer-manifest-url", "latest", "multi-platform dialer release manifest URL or 'latest' fallback when --join-dialer-manifest-path is absent")
+	flag.BoolVar(&dialerPreferUniversal, "join-dialer-prefer-universal", true, "use the universal multi-arch Linux wg-dialer fat binary when available in the release manifest")
 	flag.StringVar(&cniPluginsURLARM64, "join-cni-plugins-url-arm64", "", "optional per-arch containernetworking-plugins tarball URL; required when the cluster's CNI config chains plugins (bandwidth/portmap/tuning) a stock cloud image does not ship")
 	flag.StringVar(&cniPluginsSHA256ARM64, "join-cni-plugins-sha256-arm64", "", "sha256 of the arm64 CNI plugins tarball; a URL without it is ignored, never fetched unverified")
 	flag.StringVar(&cniPluginsURLAMD64, "join-cni-plugins-url-amd64", "", "amd64 containernetworking-plugins tarball URL")
@@ -2905,6 +2917,13 @@ func main() {
 			os.Exit(1)
 		}
 
+		var dialerManifest *join.DialerManifest
+		if m, err := join.ResolveDialerManifest(context.Background(), dialerManifestPath, dialerManifestURL); err == nil {
+			dialerManifest = m
+		}
+		if windowsTunnelSHA256 == "" && dialerManifest != nil && joinProviderName == "k0s" && windowsPublisherImage != "" {
+			windowsTunnelSHA256 = dialerManifest.WindowsTunnelSHA256()
+		}
 		bootstrapRenderers := map[string]join.BootstrapRenderer{"linux": join.PatternBootstrap{Path: joinTemplatePath, Format: bootstrap.CloudConfig}}
 		if (windowsWorkerVersion == "") != (windowsWorkerSHA256 == "") || (windowsWorkerVersion != "" && windowsTunnelSHA256 == "") {
 			fmt.Fprintln(os.Stderr, "Windows bootstrap options require a pinned tunnel executable; worker overrides also require paired version and SHA256")
@@ -2944,6 +2963,11 @@ func main() {
 			DialerBinarySHA256ARM64: dialerBinarySHA256ARM64,
 			DialerBinaryURLAMD64:    dialerBinaryURLAMD64,
 			DialerBinarySHA256AMD64: dialerBinarySHA256AMD64,
+			DialerManifest:          dialerManifest,
+			DialerManifestPath:      dialerManifestPath,
+			DialerManifestURL:       dialerManifestURL,
+			DialerPreferUniversal:   dialerPreferUniversal,
+			DialerUseLatestURL:      strings.TrimSpace(dialerManifestURL) == "latest",
 
 			CNIPluginsURLARM64:    cniPluginsURLARM64,
 			CNIPluginsSHA256ARM64: cniPluginsSHA256ARM64,
@@ -3063,4 +3087,122 @@ func subnetOf(base string) string {
 		return ""
 	}
 	return ipNet.String()
+}
+
+func runPlatformTupleCheck(args []string, out, diagnostics io.Writer) int {
+	fs := flag.NewFlagSet("endpoint-controller check", flag.ContinueOnError)
+	fs.SetOutput(diagnostics)
+	tupleExpr := fs.String("tuple", "k0s + calico,bgp + aws", "platform tuple expression (e.g. \"k0s + calico,bgp + aws\")")
+	k0sConfigPath := fs.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
+	valuesPath := fs.String("values", "", "optional Helm values.yaml path to inspect")
+	var manifestPaths []string
+	fs.Func("manifests", "optional Kubernetes manifest YAML file or directory to inspect (repeatable or comma-separated)", func(value string) error {
+		manifestPaths = append(manifestPaths, value)
+		return nil
+	})
+	format := fs.String("format", "text", "output format: text or json")
+	kubeconfig := fs.String("kubeconfig", "", "optional kubeconfig path for live cluster inspection")
+	kubecontext := fs.String("context", "", "optional kubeconfig context override")
+	tunnelMTU := fs.Int("tunnel-mtu", 1420, "WireGuard tunnel MTU budget")
+	tunnelIPv4 := fs.String("tunnel-ipv4", "10.100.0.0/24", "WireGuard IPv4 tunnel range")
+	tunnelIPv6 := fs.String("tunnel-ipv6", "fd00:10:100::/96", "WireGuard IPv6 tunnel range")
+	requireDualStack := fs.Bool("require-dual-stack", false, "require IPv4 + IPv6 dual-stack pod networking")
+	requireWindowsBGP := fs.Bool("require-windows-bgp", false, "require Windows BGP ConfigMap/DaemonSet/IPAMConfig even before a Windows node joins")
+	strictBGPPeers := fs.Bool("strict-bgp-peers", false, "require BGPPeers to explicitly exclude cloud-worker even when cloudCNI=aws-vpc")
+	timeout := fs.Duration("timeout", 30*time.Second, "API request timeout")
+
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintf(diagnostics, "unexpected positional arguments: %v\n", fs.Args())
+		return 2
+	}
+	var k0sBytes, valuesBytes []byte
+	if *k0sConfigPath != "" {
+		raw, err := os.ReadFile(*k0sConfigPath)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		k0sBytes = raw
+	}
+	if *valuesPath != "" {
+		raw, err := os.ReadFile(*valuesPath)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		valuesBytes = raw
+	}
+	manifestsBytes, err := tuple.LoadManifestBytes(manifestPaths)
+	if err != nil {
+		fmt.Fprintln(diagnostics, err)
+		return 1
+	}
+
+	var reader client.Reader
+	if *kubeconfig != "" || os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		loading := clientcmd.NewDefaultClientConfigLoadingRules()
+		if *kubeconfig != "" {
+			loading = &clientcmd.ClientConfigLoadingRules{ExplicitPath: *kubeconfig}
+		}
+		cfg, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loading, &clientcmd.ConfigOverrides{CurrentContext: *kubecontext}).ClientConfig()
+		if err != nil {
+			if *kubeconfig != "" {
+				fmt.Fprintln(diagnostics, err)
+				return 1
+			}
+		} else {
+			cfg.Timeout = *timeout
+			sc := runtime.NewScheme()
+			_ = scheme.AddToScheme(sc)
+			for _, kind := range []string{"IPPool", "BlockAffinity", "IPAMBlock", "BGPPeer", "BGPConfiguration", "IPAMConfig"} {
+				gvk := schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: kind}
+				sc.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+				sc.AddKnownTypeWithName(gvk.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
+			}
+			cl, err := client.New(cfg, client.Options{Scheme: sc})
+			if err != nil {
+				fmt.Fprintln(diagnostics, err)
+				return 1
+			}
+			reader = cl
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+	results, err := tuple.Evaluate(ctx, reader, tuple.CheckOptions{
+		Tuple:              *tupleExpr,
+		K0sConfig:          k0sBytes,
+		ValuesYAML:         valuesBytes,
+		ManifestsYAML:      manifestsBytes,
+		TunnelMTU:          *tunnelMTU,
+		TunnelIPv4:         *tunnelIPv4,
+		TunnelIPv6:         *tunnelIPv6,
+		RequireDualStack:   *requireDualStack,
+		RequireWindowsBGP:  *requireWindowsBGP,
+		StrictBGPPeerScope: *strictBGPPeers,
+	})
+	if err != nil {
+		fmt.Fprintln(diagnostics, err)
+		return 1
+	}
+	report := tuple.FormatReport(results)
+	if strings.EqualFold(strings.TrimSpace(*format), "json") {
+		if diagnostics != nil {
+			_, _ = io.WriteString(diagnostics, report)
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(results)
+	} else {
+		_, _ = io.WriteString(out, report)
+	}
+	if !tuple.Passed(results) {
+		fmt.Fprintf(diagnostics, "platform tuple %q failed one or more health/environment checks\n", *tupleExpr)
+		return 1
+	}
+	return 0
 }

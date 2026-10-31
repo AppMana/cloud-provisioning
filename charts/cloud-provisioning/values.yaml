@@ -216,15 +216,17 @@ microk8s:
 # label, or the platform default) and may not be set here.
 joinKubeletExtraFlags: ""
 
-# First-boot binary delivery. A remote node has no image puller before
-# it joins, so cloud-init fetches this sha-pinned binary; afterwards
-# the DaemonSet image is the upgrade channel. A url is an https:// URL used
-# as given, or s3://bucket/key in artifactRegion, which the controller signs
-# with aws.credentials each time it renders a bootstrap, valid as long as the
-# join token beside it; the credentials need s3:GetObject on the key and
-# must outlive the URL. The same applies to cniPlugins.
+# First-boot binary delivery. By default ("latest"), the controller resolves
+# the universal multi-arch Linux binary (wg-dialer-linux) and per-platform
+# binaries + SHA256 digests automatically from the multi-platform manifest
+# baked into the image (/join-patterns/dialer-manifest.json) or published at
+# the release manifest URL. Set explicit per-arch url/sha256 only to override
+# with a custom mirror or s3://bucket/key in artifactRegion.
 artifactRegion: ""
 dialerBinary:
+  version: "latest"
+  manifestURL: ""
+  preferUniversal: true
   arm64:
     url: ""
     sha256: ""

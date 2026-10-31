@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,13 +22,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 // CheckResult is one named outcome of a platform tuple health/environment check.
 type CheckResult struct {
-	Name   string `json:"name"`
-	Pass   bool   `json:"pass"`
-	Detail string `json:"detail"`
+	Name     string   `json:"name"`
+	Pass     bool     `json:"pass"`
+	Status   string   `json:"status,omitempty"`
+	Detail   string   `json:"detail"`
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+// EffectiveStatus returns "PASS", "WARN", or "FAIL" for this check result.
+func (r CheckResult) EffectiveStatus() string {
+	if !r.Pass {
+		return "FAIL"
+	}
+	if len(r.Warnings) > 0 || r.Status == "WARN" {
+		return "WARN"
+	}
+	return "PASS"
 }
 
 // CheckOptions configures Evaluate for a target platform tuple and cluster.
@@ -35,6 +51,11 @@ type CheckOptions struct {
 	Tuple string
 	// K0sConfig is optional raw k0s.yaml or k0sctl.yaml bytes to validate.
 	K0sConfig []byte
+	// ValuesYAML is optional Helm values.yaml bytes for charts/cloud-provisioning.
+	ValuesYAML []byte
+	// ManifestsYAML is optional Kubernetes manifest YAML documents to inspect
+	// (ProvisionedNodeClass, BGPPeer, Deployment, etc.).
+	ManifestsYAML [][]byte
 	// TunnelIPv4 is the planned IPv4 WireGuard tunnel subnet (default 10.100.0.0/24).
 	TunnelIPv4 string
 	// TunnelIPv6 is the planned IPv6 WireGuard tunnel subnet (default fd00:10:100::/96).
@@ -51,7 +72,7 @@ type CheckOptions struct {
 	StrictBGPPeerScope bool
 }
 
-// Passed reports whether every CheckResult succeeded.
+// Passed reports whether every CheckResult succeeded (including checks with warnings).
 func Passed(results []CheckResult) bool {
 	for _, r := range results {
 		if !r.Pass {
@@ -59,6 +80,86 @@ func Passed(results []CheckResult) bool {
 		}
 	}
 	return len(results) > 0
+}
+
+// Warnings returns all warning messages emitted across the evaluated CheckResults.
+func Warnings(results []CheckResult) []string {
+	var out []string
+	for _, r := range results {
+		for _, w := range r.Warnings {
+			w = strings.TrimSpace(w)
+			if w == "" {
+				continue
+			}
+			out = append(out, fmt.Sprintf("%s: %s", r.Name, w))
+		}
+	}
+	return out
+}
+
+// FormatReport renders a human-readable summary of all CheckResults, including
+// PASS/WARN/FAIL status and any per-check warnings.
+func FormatReport(results []CheckResult) string {
+	var b strings.Builder
+	for _, r := range results {
+		fmt.Fprintf(&b, "%-4s  %-24s  %s\n", r.EffectiveStatus(), r.Name, r.Detail)
+		for _, w := range r.Warnings {
+			fmt.Fprintf(&b, "      warning: %s\n", w)
+		}
+	}
+	return b.String()
+}
+
+func normalizeResults(results []CheckResult) []CheckResult {
+	for i := range results {
+		results[i].Status = results[i].EffectiveStatus()
+	}
+	return results
+}
+
+// LoadManifestBytes reads one or more YAML manifest file paths or directories
+// (comma-separated or repeated) into raw document slices for CheckOptions.ManifestsYAML.
+func LoadManifestBytes(paths []string) ([][]byte, error) {
+	var out [][]byte
+	for _, rawPath := range paths {
+		for _, part := range strings.Split(rawPath, ",") {
+			p := strings.TrimSpace(part)
+			if p == "" {
+				continue
+			}
+			info, err := os.Stat(p)
+			if err != nil {
+				return nil, err
+			}
+			if !info.IsDir() {
+				b, err := os.ReadFile(p)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, b)
+				continue
+			}
+			entries, err := os.ReadDir(p)
+			if err != nil {
+				return nil, err
+			}
+			for _, entry := range entries {
+				if entry.IsDir() {
+					continue
+				}
+				ext := strings.ToLower(filepath.Ext(entry.Name()))
+				if ext != ".yaml" && ext != ".yml" && ext != ".json" {
+					continue
+				}
+				b, err := os.ReadFile(filepath.Join(p, entry.Name()))
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, b)
+			}
+		}
+	}
+	return out, nil
 }
 
 // Evaluate runs the full health and environment check for the chosen platform tuple.
@@ -81,7 +182,7 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 	parsedTuple, err := Parse(tupleStr)
 	if err != nil {
 		out = append(out, CheckResult{Name: "tuple", Pass: false, Detail: err.Error()})
-		return out, nil
+		return normalizeResults(out), nil
 	}
 	out = append(out, CheckResult{
 		Name:   "tuple",
@@ -90,21 +191,35 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 	})
 
 	if len(opts.K0sConfig) > 0 {
-		if err := ValidateK0sCalicoConfig(opts.K0sConfig); err != nil {
+		warnings, err := InspectK0sCalicoConfig(opts.K0sConfig, parsedTuple, opts.TunnelMTU)
+		if err != nil {
 			out = append(out, CheckResult{Name: "k0s-config", Pass: false, Detail: err.Error()})
 		} else {
-			out = append(out, CheckResult{Name: "k0s-config", Pass: true, Detail: "allocate-node-cidrs=false, calico bird/Never, and MTU aligned with FELIX_*MTU"})
+			out = append(out, CheckResult{
+				Name:     "k0s-config",
+				Pass:     true,
+				Detail:   "allocate-node-cidrs=false, calico bird/Never, and MTU aligned with FELIX_*MTU",
+				Warnings: warnings,
+			})
 		}
 	}
 
+	if len(opts.ValuesYAML) > 0 {
+		out = append(out, checkHelmValues(opts.ValuesYAML, parsedTuple))
+	}
+
+	if len(opts.ManifestsYAML) > 0 {
+		out = append(out, checkManifests(opts.ManifestsYAML, parsedTuple))
+	}
+
 	if c == nil {
-		return out, nil
+		return normalizeResults(out), nil
 	}
 
 	network, err := cni.Detect(ctx, c)
 	if err != nil {
 		out = append(out, CheckResult{Name: "network", Pass: false, Detail: err.Error()})
-		return out, nil
+		return normalizeResults(out), nil
 	}
 
 	expectedEncap := parsedTuple.ExpectedEncapsulation()
@@ -138,8 +253,17 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 	if err != nil {
 		return nil, err
 	}
-	if parsedTuple.CNI == cni.Calico && (opts.RequireWindowsBGP || (parsedTuple.IncludesWindows() && windowsPresent)) {
-		out = append(out, checkWindowsBGP(ctx, c, dualStack || opts.RequireDualStack))
+	if parsedTuple.CNI == cni.Calico && (opts.RequireWindowsBGP || parsedTuple.IncludesWindows()) {
+		winRes := checkWindowsBGP(ctx, c, dualStack || opts.RequireDualStack)
+		if !winRes.Pass && !opts.RequireWindowsBGP && !windowsPresent {
+			winRes.Pass = true
+			winRes.Status = "WARN"
+			winRes.Warnings = []string{fmt.Sprintf(
+				"tuple %s includes Windows nodes, but Windows BGP resources are not yet installed (%s); endpoint-controller or 'platform-tuple fix' will reconcile them before Windows nodes join",
+				parsedTuple, winRes.Detail,
+			)}
+		}
+		out = append(out, winRes)
 	}
 	if parsedTuple.Distribution == "k0s" && parsedTuple.IncludesWindows() {
 		if err := joink0s.WindowsEgressReady(ctx, c); err != nil {
@@ -155,8 +279,11 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 	out = append(out, checkBorrowedAddresses(ctx, c))
 	out = append(out, checkTunnelRanges(ctx, c, dualStack, opts.TunnelIPv4, opts.TunnelIPv6))
 	out = append(out, checkEndpointCandidates(ctx, c))
+	if workloadRes, ok := checkCloudWorkerWorkloads(ctx, c); ok {
+		out = append(out, workloadRes)
+	}
 
-	return out, nil
+	return normalizeResults(out), nil
 }
 
 // VerifyClaimEnvironment is the runtime preflight called by endpoint-controller's
@@ -255,10 +382,18 @@ func checkCalicoMTU(ctx context.Context, c client.Reader, parsedTuple Tuple, tun
 			Detail: fmt.Sprintf("calico pod MTU %d (%s) > tunnel MTU %d for cloudCNI=site", cniMTU, source, tunnelMTU),
 		}
 	}
+	var warnings []string
+	if parsedTuple.CloudCNI == "aws-vpc" && tunnelMTU > 0 && cniMTU > tunnelMTU {
+		warnings = append(warnings, fmt.Sprintf(
+			"site Calico pod MTU (%d) exceeds WireGuard tunnel MTU (%d); aws-node clamps aws-vpc cloud-worker pods to %d while site pods use %d",
+			cniMTU, tunnelMTU, tunnelMTU, cniMTU,
+		))
+	}
 	return CheckResult{
-		Name:   "calico-mtu",
-		Pass:   true,
-		Detail: fmt.Sprintf("calico CNI and Felix MTU aligned at %d (%s, cloudCNI=%s tunnelMTU=%d)", cniMTU, source, parsedTuple.CloudCNI, tunnelMTU),
+		Name:     "calico-mtu",
+		Pass:     true,
+		Detail:   fmt.Sprintf("calico CNI and Felix MTU aligned at %d (%s, cloudCNI=%s tunnelMTU=%d)", cniMTU, source, parsedTuple.CloudCNI, tunnelMTU),
+		Warnings: warnings,
 	}
 }
 
@@ -452,7 +587,12 @@ func checkSiteCNIExclusion(ctx context.Context, c client.Reader, network cni.Net
 			}
 		}
 	}
-	return CheckResult{Name: "site-cni-exclusion", Pass: true, Detail: "no cloud-worker nodes present yet; endpoint-controller Excluder will apply nodeAffinity"}
+	return CheckResult{
+		Name:     "site-cni-exclusion",
+		Pass:     true,
+		Detail:   "no cloud-worker nodes present yet; endpoint-controller Excluder will apply nodeAffinity",
+		Warnings: []string{"site CNI DaemonSets do not yet exclude cloud-worker via nodeAffinity; endpoint-controller Excluder or 'platform-tuple fix' will reconcile this before cloud workers join"},
+	}
 }
 
 func daemonSetExcludesCloudRole(ds *appsv1.DaemonSet) bool {
@@ -489,6 +629,10 @@ func checkBGPPeers(ctx context.Context, c client.Reader, parsedTuple Tuple, stri
 		Name:   "bgp-peers",
 		Pass:   true,
 		Detail: fmt.Sprintf("BGPPeer(s) %v select by OS; safe for cloudCNI=%s because calico-node is excluded from %s nodes", peers, parsedTuple.CloudCNI, parsedTuple.CloudCNI),
+		Warnings: []string{fmt.Sprintf(
+			"BGPPeer(s) %v select nodes without '!has(%s)'; recommend adding '!has(%s)' to nodeSelector so cloud-worker nodes never peer with site routers",
+			peers, platform.RoleLabel, platform.RoleLabel,
+		)},
 	}
 }
 
@@ -733,4 +877,268 @@ func InspectLinuxCalicoDaemonSet(u *unstructured.Unstructured, expectedMTU int) 
 		}
 	}
 	return nil
+}
+
+var optInAWSRegions = map[string]bool{
+	"af-south-1":     true,
+	"ap-east-1":      true,
+	"ap-south-2":     true,
+	"ap-southeast-3": true,
+	"ap-southeast-4": true,
+	"ca-west-1":      true,
+	"eu-central-2":   true,
+	"eu-south-1":     true,
+	"eu-south-2":     true,
+	"il-central-1":   true,
+	"me-central-1":   true,
+	"me-south-1":     true,
+}
+
+func isARM64InstanceType(it string) bool {
+	family, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(it)), ".")
+	if family == "a1" {
+		return true
+	}
+	for _, prefix := range []string{"t4g", "m6g", "m7g", "m8g", "c6g", "c7g", "c8g", "r6g", "r7g", "r8g", "x2gd", "im4gn", "is4gen"} {
+		if strings.HasPrefix(family, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSmallBurstableInstanceType(it string) bool {
+	it = strings.ToLower(strings.TrimSpace(it))
+	for _, suffix := range []string{".nano", ".micro", ".small"} {
+		if strings.HasSuffix(it, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func checkHelmValues(raw []byte, parsedTuple Tuple) CheckResult {
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return CheckResult{Name: "helm-values", Pass: false, Detail: fmt.Sprintf("parse values YAML: %v", err)}
+	}
+	var warnings []string
+	var pinnedFields []string
+
+	for _, arch := range []string{"arm64", "amd64"} {
+		urlStr, _, _ := unstructured.NestedString(doc, "dialerBinary", arch, "url")
+		shaStr, _, _ := unstructured.NestedString(doc, "dialerBinary", arch, "sha256")
+		urlStr = strings.TrimSpace(urlStr)
+		shaStr = strings.TrimSpace(shaStr)
+		if (urlStr != "") != (shaStr != "") {
+			return CheckResult{
+				Name:   "helm-values",
+				Pass:   false,
+				Detail: fmt.Sprintf("dialerBinary.%s.url and dialerBinary.%s.sha256 must both be set when overriding the release manifest", arch, arch),
+			}
+		}
+		if urlStr != "" || shaStr != "" {
+			pinnedFields = append(pinnedFields, "dialerBinary."+arch)
+		}
+	}
+	winSHA, _, _ := unstructured.NestedString(doc, "windowsBootstrap", "tunnelSHA256")
+	if strings.TrimSpace(winSHA) != "" {
+		pinnedFields = append(pinnedFields, "windowsBootstrap.tunnelSHA256")
+	}
+	if len(pinnedFields) > 0 {
+		warnings = append(warnings, fmt.Sprintf(
+			"hardcoded dialer binary overrides (%s) are brittle; omit them to use dialerBinary.version=\"latest\" with the multi-platform manifest and universal Linux fat binary",
+			strings.Join(pinnedFields, ", "),
+		))
+	}
+
+	if excl, found, _ := unstructured.NestedBool(doc, "siteCNI", "exclusion"); found && !excl {
+		if parsedTuple.CloudCNI == "aws-vpc" {
+			return CheckResult{
+				Name:   "helm-values",
+				Pass:   false,
+				Detail: "siteCNI.exclusion=false is unsafe when cloudCNI=aws-vpc because site CNI DaemonSets will schedule onto aws-vpc cloud workers",
+			}
+		}
+		warnings = append(warnings, "siteCNI.exclusion=false disables automatic nodeAffinity exclusion on site CNI DaemonSets")
+	}
+
+	version, _, _ := unstructured.NestedString(doc, "dialerBinary", "version")
+	if strings.TrimSpace(version) == "" {
+		version = "latest"
+	}
+	return CheckResult{
+		Name:     "helm-values",
+		Pass:     true,
+		Detail:   fmt.Sprintf("dialerBinary.version=%s", version),
+		Warnings: warnings,
+	}
+}
+
+func checkManifests(files [][]byte, parsedTuple Tuple) CheckResult {
+	var warnings []string
+	var count int
+	for _, rawFile := range files {
+		for _, chunk := range strings.Split(string(rawFile), "\n---") {
+			trimmed := strings.TrimSpace(chunk)
+			if trimmed == "" || trimmed == "---" {
+				continue
+			}
+			var obj map[string]interface{}
+			if err := yaml.Unmarshal([]byte(trimmed), &obj); err != nil {
+				return CheckResult{Name: "manifests", Pass: false, Detail: fmt.Sprintf("parse manifest YAML: %v", err)}
+			}
+			if len(obj) == 0 {
+				continue
+			}
+			u := &unstructured.Unstructured{Object: obj}
+			kind := u.GetKind()
+			name := u.GetName()
+			if kind == "" {
+				continue
+			}
+			count++
+			switch kind {
+			case "ProvisionedNodeClass":
+				osVal, _, _ := unstructured.NestedString(obj, "spec", "os")
+				if osVal == "" {
+					osVal = "linux"
+				}
+				cniVal, _, _ := unstructured.NestedString(obj, "spec", "cni")
+				itVal, _, _ := unstructured.NestedString(obj, "spec", "instanceType")
+				regionVal, _, _ := unstructured.NestedString(obj, "spec", "region")
+				amiVal, _, _ := unstructured.NestedString(obj, "spec", "amiID")
+				var rootVol int
+				if rv, found, _ := unstructured.NestedFieldNoCopy(obj, "spec", "rootVolumeGiB"); found {
+					switch v := rv.(type) {
+					case int64:
+						rootVol = int(v)
+					case float64:
+						rootVol = int(v)
+					case int:
+						rootVol = v
+					}
+				}
+				if osVal == "windows" && isARM64InstanceType(itVal) {
+					return CheckResult{
+						Name:   "manifests",
+						Pass:   false,
+						Detail: fmt.Sprintf("ProvisionedNodeClass %s pairs os=windows with ARM64 instanceType=%s", name, itVal),
+					}
+				}
+				if osVal == "windows" && !parsedTuple.IncludesWindows() {
+					warnings = append(warnings, fmt.Sprintf("ProvisionedNodeClass %s sets os=windows, but selected tuple %s is Linux-only", name, parsedTuple))
+				}
+				if cniVal != "" && parsedTuple.CloudCNI != "" && cniVal != parsedTuple.CloudCNI {
+					warnings = append(warnings, fmt.Sprintf("ProvisionedNodeClass %s sets spec.cni=%s while tuple %s defaults to cloudCNI=%s", name, cniVal, parsedTuple, parsedTuple.CloudCNI))
+				}
+				if optInAWSRegions[strings.TrimSpace(regionVal)] && strings.TrimSpace(amiVal) == "" {
+					warnings = append(warnings, fmt.Sprintf("ProvisionedNodeClass %s targets AWS opt-in region %s without an explicit amiID; ensure the opt-in region is enabled in the AWS account", name, regionVal))
+				}
+				if isSmallBurstableInstanceType(itVal) && rootVol > 0 && rootVol < 20 {
+					warnings = append(warnings, fmt.Sprintf("ProvisionedNodeClass %s uses %s with rootVolumeGiB=%d; recommend >= 20 GiB to avoid disk-pressure evictions", name, itVal, rootVol))
+				}
+			case "BGPPeer":
+				sel, _, _ := unstructured.NestedString(obj, "spec", "nodeSelector")
+				if !strings.Contains(sel, platform.RoleLabel) && (sel == "" || strings.Contains(sel, "all()") || strings.Contains(sel, "kubernetes.io/os")) {
+					if parsedTuple.CloudCNI == "site" {
+						return CheckResult{
+							Name:   "manifests",
+							Pass:   false,
+							Detail: fmt.Sprintf("BGPPeer %s nodeSelector %q selects cloud-worker nodes without '!has(%s)' under cloudCNI=site", name, sel, platform.RoleLabel),
+						}
+					}
+					warnings = append(warnings, fmt.Sprintf("BGPPeer %s nodeSelector %q does not include '!has(%s)'; recommend scoping BGPPeer to on-site nodes", name, sel, platform.RoleLabel))
+				}
+			case "Deployment":
+				var dep appsv1.Deployment
+				rawJSON, err := json.Marshal(obj)
+				if err == nil && json.Unmarshal(rawJSON, &dep) == nil {
+					if w := inspectCloudWorkerDeployment(&dep); w != "" {
+						warnings = append(warnings, w)
+					}
+				}
+			}
+		}
+	}
+	return CheckResult{
+		Name:     "manifests",
+		Pass:     true,
+		Detail:   fmt.Sprintf("inspected %d manifest object(s)", count),
+		Warnings: warnings,
+	}
+}
+
+func checkCloudWorkerWorkloads(ctx context.Context, c client.Reader) (CheckResult, bool) {
+	var deps appsv1.DeploymentList
+	if err := c.List(ctx, &deps); err != nil {
+		return CheckResult{}, false
+	}
+	var warnings []string
+	var cloudCount int
+	for i := range deps.Items {
+		dep := &deps.Items[i]
+		if !targetsCloudWorkers(dep) {
+			continue
+		}
+		cloudCount++
+		if w := inspectCloudWorkerDeployment(dep); w != "" {
+			warnings = append(warnings, w)
+		}
+	}
+	if cloudCount == 0 && len(warnings) == 0 {
+		return CheckResult{}, false
+	}
+	return CheckResult{
+		Name:     "cloud-worker-workloads",
+		Pass:     true,
+		Detail:   fmt.Sprintf("inspected %d cloud-worker Deployment(s)", cloudCount),
+		Warnings: warnings,
+	}, true
+}
+
+func targetsCloudWorkers(dep *appsv1.Deployment) bool {
+	if dep.Spec.Template.Spec.NodeSelector[platform.RoleLabel] == platform.RoleValue {
+		return true
+	}
+	for _, tol := range dep.Spec.Template.Spec.Tolerations {
+		if tol.Key == "cloud-provisioning.appmana.com/cloud-worker" || tol.Key == platform.RoleLabel {
+			return true
+		}
+	}
+	return false
+}
+
+func inspectCloudWorkerDeployment(dep *appsv1.Deployment) string {
+	if !targetsCloudWorkers(dep) {
+		return ""
+	}
+	var hostPorts []int32
+	for _, container := range dep.Spec.Template.Spec.Containers {
+		for _, p := range container.Ports {
+			if p.HostPort > 0 {
+				hostPorts = append(hostPorts, p.HostPort)
+			}
+		}
+	}
+	if len(hostPorts) == 0 {
+		return ""
+	}
+	if dep.Spec.Strategy.Type == appsv1.RecreateDeploymentStrategyType {
+		return ""
+	}
+	if dep.Spec.Strategy.RollingUpdate != nil && dep.Spec.Strategy.RollingUpdate.MaxSurge != nil {
+		ms := dep.Spec.Strategy.RollingUpdate.MaxSurge.String()
+		if ms == "0" || ms == "0%" {
+			return ""
+		}
+	}
+	ns := dep.Namespace
+	if ns == "" {
+		ns = "default"
+	}
+	return fmt.Sprintf(
+		"Deployment %s/%s targets cloud-worker with hostPort %v without strategy.type=Recreate or rollingUpdate.maxSurge=0; rollouts will deadlock on single-instance cloud tiers",
+		ns, dep.Name, hostPorts,
+	)
 }

@@ -9,6 +9,7 @@ COPY --from=binaries /linux/${TARGETARCH}/platform-tuple /platform-tuple
 # templates are versioned alongside this Dockerfile's own repo, not a
 # separate distribution mechanism.
 COPY join-patterns /join-patterns
+COPY --from=binaries /dialer-manifest.json /join-patterns/dialer-manifest.json
 USER nonroot:nonroot
 ENTRYPOINT ["/endpoint-controller"]
 

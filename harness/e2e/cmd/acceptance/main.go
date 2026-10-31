@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	"github.com/appmana/cloud-provisioning/harness/e2e/acceptance"
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +58,12 @@ func runWith(args []string,
 	tunnel6 := flags.String("tunnel-ipv6", "fd00:10:100::/96", "tunnel IPv6 prefix (chart tunnel.ipv6Prefix)")
 	tupleExpr := flags.String("tuple", "", "optional platform tuple to qualify (e.g. \"k0s + calico,bgp + aws\")")
 	k0sConfigPath := flags.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
+	valuesPath := flags.String("values", "", "optional Helm values.yaml path to inspect")
+	var manifestPaths []string
+	flags.Func("manifests", "optional Kubernetes manifest YAML file or directory to inspect (repeatable or comma-separated)", func(value string) error {
+		manifestPaths = append(manifestPaths, value)
+		return nil
+	})
 	out := flags.String("out", "", "write the JSON result here (must not exist)")
 	nodes := flags.String("nodes", "", "matrix: comma-separated nodes (default: every Ready Linux node)")
 	tries := flags.Int("udp-tries", 10, "matrix: datagrams per UDP size")
@@ -65,18 +72,33 @@ func runWith(args []string,
 	udpSHA := flags.String("udp-probe-sha256", "", "required SHA256 of --udp-probe-file")
 	moduleDir := flags.String("module-dir", ".", "matrix: harness module directory the UDP prober is built from")
 	timeout := flags.Duration("timeout", 45*time.Minute, "deadline for the whole command")
+
+	isVerb := func(v string) bool {
+		return v == "check" || v == "preconditions" || v == "matrix"
+	}
+	var verb string
+	if len(args) > 0 && isVerb(args[0]) {
+		verb = args[0]
+		args = args[1:]
+	}
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 1 || (flags.Arg(0) != "preconditions" && flags.Arg(0) != "matrix") {
-		return fmt.Errorf("usage: acceptance -kubeconfig FILE [flags] preconditions|matrix")
+	if flags.NArg() > 0 && verb == "" && isVerb(flags.Arg(0)) {
+		verb = flags.Arg(0)
+		if err := flags.Parse(flags.Args()[1:]); err != nil {
+			return err
+		}
+	}
+	if verb == "" || flags.NArg() != 0 {
+		return fmt.Errorf("usage: acceptance [-kubeconfig FILE] [flags] check|preconditions|matrix")
 	}
 	if *out != "" {
 		if _, err := os.Stat(*out); err == nil {
 			return fmt.Errorf("%s exists; use a new evidence path", *out)
 		}
 	}
-	var k0sBytes []byte
+	var k0sBytes, valuesBytes []byte
 	if *k0sConfigPath != "" {
 		raw, err := os.ReadFile(*k0sConfigPath)
 		if err != nil {
@@ -84,20 +106,44 @@ func runWith(args []string,
 		}
 		k0sBytes = raw
 	}
-	config, err := acceptance.Config(*kubeconfig, *kubeContext)
+	if *valuesPath != "" {
+		raw, err := os.ReadFile(*valuesPath)
+		if err != nil {
+			return err
+		}
+		valuesBytes = raw
+	}
+	manifestsBytes, err := tuple.LoadManifestBytes(manifestPaths)
 	if err != nil {
 		return err
+	}
+	var config *rest.Config
+	var serverHost string
+	if *kubeconfig != "" || verb != "check" {
+		config, err = acceptance.Config(*kubeconfig, *kubeContext)
+		if err != nil {
+			return err
+		}
+		serverHost = config.Host
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 
-	opts := acceptance.Options{TunnelMTU: *tunnelMTU, TunnelIPv4: *tunnel4, TunnelIPv6: *tunnel6, Tuple: *tupleExpr, K0sConfig: k0sBytes}
+	opts := acceptance.Options{
+		TunnelMTU:     *tunnelMTU,
+		TunnelIPv4:    *tunnel4,
+		TunnelIPv6:    *tunnel6,
+		Tuple:         *tupleExpr,
+		K0sConfig:     k0sBytes,
+		ValuesYAML:    valuesBytes,
+		ManifestsYAML: manifestsBytes,
+	}
 	result := map[string]any{
 		"observedAt": time.Now().UTC(),
-		"server":     config.Host,
-		"mode":       flags.Arg(0),
+		"server":     serverHost,
+		"mode":       verb,
 		"options":    opts,
 	}
 	// Preconditions always run, read-only, before anything is created.
@@ -114,15 +160,20 @@ func runWith(args []string,
 			verdict = "FAIL"
 		case !c.Required:
 			verdict = "INFO"
+		case len(c.Warnings) > 0:
+			verdict = "WARN"
 		}
 		fmt.Printf("  %-4s  %-20s %s\n", verdict, c.Name, c.Detail)
+		for _, w := range c.Warnings {
+			fmt.Printf("        warning: %s\n", w)
+		}
 	}
 
 	ok := acceptance.Passed(checks)
-	if flags.Arg(0) == "matrix" && !ok {
+	if verb == "matrix" && !ok {
 		result["matrixSkipped"] = "required preconditions failed; no probes created"
 	}
-	if flags.Arg(0) == "matrix" && ok {
+	if verb == "matrix" && ok {
 		passes := []map[string]any{}
 		failedChecks := 0
 		allPassed := true
@@ -167,6 +218,9 @@ func runWith(args []string,
 }
 
 func preconditions(ctx context.Context, config *rest.Config, opts acceptance.Options) ([]acceptance.Check, error) {
+	if config == nil {
+		return acceptance.Preconditions(ctx, nil, opts)
+	}
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		return nil, err

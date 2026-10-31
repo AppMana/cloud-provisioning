@@ -150,10 +150,21 @@ type Reconciler struct {
 	// verifies the pinned digest before enabling the unit. sha256 is
 	// pinned at render time, so a compromised download host cannot swap
 	// the binary.
+	//
+	// When the per-arch URL/SHA256 fields are left empty, Reconciler
+	// resolves them automatically from DialerManifest (or loads
+	// DialerManifestPath / DialerManifestURL, defaulting to the baked
+	// multi-platform /join-patterns/dialer-manifest.json or "latest"
+	// release manifest).
 	DialerBinaryURLARM64    string
 	DialerBinarySHA256ARM64 string
 	DialerBinaryURLAMD64    string
 	DialerBinarySHA256AMD64 string
+	DialerManifest          *DialerManifest
+	DialerManifestPath      string
+	DialerManifestURL       string
+	DialerPreferUniversal   bool
+	DialerUseLatestURL      bool
 
 	// SignArtifact turns an s3://bucket/key artifact source into a URL a
 	// machine can fetch, signed when the bootstrap is rendered, so the
@@ -383,6 +394,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		apiProxyPort = r.APIProxyPort
 	}
 
+	if err := r.ResolveDialerBinaries(ctx); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	artifacts := map[string]string{}
 	for key, source := range map[string]string{
 		"dialerBinaryURLArm64": r.DialerBinaryURLARM64, "dialerBinaryURLAmd64": r.DialerBinaryURLAMD64,
@@ -571,6 +586,48 @@ func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 	for _, p := range r.InfraProviders {
 		if p.GVK().Kind == kind {
 			return p
+		}
+	}
+	return nil
+}
+
+// ResolveDialerBinaries populates missing per-arch dialer binary URLs and SHA256
+// digests from the configured multi-platform DialerManifest (or loads it from
+// DialerManifestPath / DialerManifestURL). Explicit per-arch flags always take
+// precedence over manifest defaults.
+func (r *Reconciler) ResolveDialerBinaries(ctx context.Context) error {
+	armSet := r.DialerBinaryURLARM64 != "" || r.DialerBinarySHA256ARM64 != ""
+	amdSet := r.DialerBinaryURLAMD64 != "" || r.DialerBinarySHA256AMD64 != ""
+	if armSet && amdSet {
+		return nil
+	}
+	manifest := r.DialerManifest
+	if manifest == nil && (strings.TrimSpace(r.DialerManifestPath) != "" || strings.TrimSpace(r.DialerManifestURL) != "") {
+		m, err := ResolveDialerManifest(ctx, r.DialerManifestPath, r.DialerManifestURL)
+		if err != nil {
+			// If at least one architecture was explicitly configured, do not fail
+			// when the optional default manifest file is absent.
+			if armSet || amdSet {
+				return nil
+			}
+			return err
+		}
+		manifest = m
+		r.DialerManifest = m
+	}
+	if manifest == nil {
+		return nil
+	}
+	if !armSet {
+		if u, sha, err := manifest.LinuxBinaryForArch("arm64", r.DialerPreferUniversal, r.DialerUseLatestURL); err == nil {
+			r.DialerBinaryURLARM64 = u
+			r.DialerBinarySHA256ARM64 = sha
+		}
+	}
+	if !amdSet {
+		if u, sha, err := manifest.LinuxBinaryForArch("amd64", r.DialerPreferUniversal, r.DialerUseLatestURL); err == nil {
+			r.DialerBinaryURLAMD64 = u
+			r.DialerBinarySHA256AMD64 = sha
 		}
 	}
 	return nil

@@ -156,3 +156,62 @@ users:
 		t.Fatalf("lost failure evidence: %s", raw)
 	}
 }
+
+func TestCheckVerbSupportsOfflineTupleAndManifestInspection(t *testing.T) {
+	dir := t.TempDir()
+	valuesFile := filepath.Join(dir, "values.yaml")
+	if err := os.WriteFile(valuesFile, []byte(`
+dialerBinary:
+  arm64:
+    url: "https://example.com/wg-dialer-linux-arm64"
+    sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifestFile := filepath.Join(dir, "manifests.yaml")
+	if err := os.WriteFile(manifestFile, []byte(`
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClass
+metadata:
+  name: edge-node
+spec:
+  os: linux
+  region: ap-east-1
+  instanceType: t4g.small
+  rootVolumeGiB: 12
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(dir, "check-result.json")
+	if err := run([]string{
+		"check",
+		"-tuple", "k0s + calico,bgp + aws",
+		"-values", valuesFile,
+		"-manifests", manifestFile,
+		"-out", output,
+	}); err != nil {
+		t.Fatalf("acceptance check verb failed: %v", err)
+	}
+	raw, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report struct {
+		OK            bool               `json:"ok"`
+		Mode          string             `json:"mode"`
+		Preconditions []acceptance.Check `json:"preconditions"`
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Mode != "check" || len(report.Preconditions) != 3 {
+		t.Fatalf("unexpected acceptance check report: %+v", report)
+	}
+	var warningsCount int
+	for _, c := range report.Preconditions {
+		warningsCount += len(c.Warnings)
+	}
+	if warningsCount == 0 {
+		t.Fatalf("expected warnings in acceptance check report, got: %+v", report.Preconditions)
+	}
+}

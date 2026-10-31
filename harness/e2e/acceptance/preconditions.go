@@ -35,6 +35,10 @@ type Options struct {
 	Tuple string
 	// K0sConfig is optional raw k0s.yaml or k0sctl.yaml bytes to validate.
 	K0sConfig []byte `json:"-"`
+	// ValuesYAML is optional Helm values.yaml bytes to inspect.
+	ValuesYAML []byte `json:"-"`
+	// ManifestsYAML is optional Kubernetes manifest YAML documents to inspect.
+	ManifestsYAML [][]byte `json:"-"`
 }
 
 func (o Options) withDefaults() Options {
@@ -54,10 +58,11 @@ func (o Options) withDefaults() Options {
 // the cluster needs before the product can work on it; the others report
 // what was observed.
 type Check struct {
-	Name     string `json:"name"`
-	Required bool   `json:"required"`
-	OK       bool   `json:"ok"`
-	Detail   string `json:"detail"`
+	Name     string   `json:"name"`
+	Required bool     `json:"required"`
+	OK       bool     `json:"ok"`
+	Detail   string   `json:"detail"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Passed reports whether every required check passed.
@@ -88,6 +93,30 @@ func Preconditions(ctx context.Context, c client.Reader, o Options) ([]Check, er
 		return nil, fmt.Errorf("tunnel IPv6 range: %w", err)
 	}
 	var out []Check
+	if c == nil {
+		tupleChecks, err := tuple.Evaluate(ctx, nil, tuple.CheckOptions{
+			Tuple:         o.Tuple,
+			K0sConfig:     o.K0sConfig,
+			ValuesYAML:    o.ValuesYAML,
+			ManifestsYAML: o.ManifestsYAML,
+			TunnelMTU:     o.TunnelMTU,
+			TunnelIPv4:    o.TunnelIPv4,
+			TunnelIPv6:    o.TunnelIPv6,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, tc := range tupleChecks {
+			out = append(out, Check{
+				Name:     tc.Name,
+				Required: true,
+				OK:       tc.Pass,
+				Detail:   tc.Detail,
+				Warnings: tc.Warnings,
+			})
+		}
+		return out, nil
+	}
 
 	network, err := cni.Detect(ctx, c)
 	if err != nil {
@@ -133,25 +162,28 @@ func Preconditions(ctx context.Context, c client.Reader, o Options) ([]Check, er
 		out = append(out, borrowedAddresses(ctx, c), bgpPeers(ctx, c))
 	}
 	out = append(out, endpointCandidates(nodes.Items))
-	if strings.TrimSpace(o.Tuple) != "" || len(o.K0sConfig) > 0 {
+	if strings.TrimSpace(o.Tuple) != "" || len(o.K0sConfig) > 0 || len(o.ValuesYAML) > 0 || len(o.ManifestsYAML) > 0 {
 		tupleChecks, err := tuple.Evaluate(ctx, c, tuple.CheckOptions{
-			Tuple:      o.Tuple,
-			K0sConfig:  o.K0sConfig,
-			TunnelMTU:  o.TunnelMTU,
-			TunnelIPv4: o.TunnelIPv4,
-			TunnelIPv6: o.TunnelIPv6,
+			Tuple:         o.Tuple,
+			K0sConfig:     o.K0sConfig,
+			ValuesYAML:    o.ValuesYAML,
+			ManifestsYAML: o.ManifestsYAML,
+			TunnelMTU:     o.TunnelMTU,
+			TunnelIPv4:    o.TunnelIPv4,
+			TunnelIPv6:    o.TunnelIPv6,
 		})
 		if err != nil {
 			return nil, err
 		}
 		for _, tc := range tupleChecks {
 			switch tc.Name {
-			case "tuple", "k0s-config", "calico-mtu", "calico-autodetection", "windows-bgp", "k0s-windows-egress", "site-cni-exclusion":
+			case "tuple", "k0s-config", "helm-values", "manifests", "calico-mtu", "calico-autodetection", "windows-bgp", "k0s-windows-egress", "site-cni-exclusion", "cloud-worker-workloads":
 				out = append(out, Check{
 					Name:     tc.Name,
 					Required: true,
 					OK:       tc.Pass,
 					Detail:   tc.Detail,
+					Warnings: tc.Warnings,
 				})
 			}
 		}

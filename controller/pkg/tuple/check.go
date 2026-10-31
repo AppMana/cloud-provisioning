@@ -70,6 +70,9 @@ type CheckOptions struct {
 	// StrictBGPPeerScope requires BGPPeers to explicitly exclude cloud-worker
 	// even when cloud workers use aws-vpc native CNI rather than site CNI.
 	StrictBGPPeerScope bool
+	// NodeVethMTUs is an optional map of nodeName -> (cali* veth name -> live MTU)
+	// used to detect pre-existing pod veth interfaces that still carry a stale MTU.
+	NodeVethMTUs map[string]map[string]int
 }
 
 // Passed reports whether every CheckResult succeeded (including checks with warnings).
@@ -244,15 +247,16 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 		Detail: fmt.Sprintf("dualStack=%t", dualStack),
 	})
 
-	if parsedTuple.CNI == cni.Calico {
-		out = append(out, checkCalicoMTU(ctx, c, parsedTuple, opts.TunnelMTU))
-		out = append(out, checkCalicoAutodetection(ctx, c, opts.TunnelIPv4, opts.TunnelIPv6, dualStack || opts.RequireDualStack))
-	}
-
 	windowsPresent, err := hasWindowsNodeOrDaemonSet(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+	if parsedTuple.CNI == cni.Calico {
+		out = append(out, checkCalicoMTU(ctx, c, parsedTuple, opts.TunnelMTU, opts.NodeVethMTUs))
+		out = append(out, checkCalicoAutodetection(ctx, c, opts.TunnelIPv4, opts.TunnelIPv6, dualStack || opts.RequireDualStack))
+		out = append(out, checkCalicoIPAM(ctx, c, opts.RequireWindowsBGP || windowsPresent))
+	}
+
 	if parsedTuple.CNI == cni.Calico && (opts.RequireWindowsBGP || parsedTuple.IncludesWindows()) {
 		winRes := checkWindowsBGP(ctx, c, dualStack || opts.RequireDualStack)
 		if !winRes.Pass && !opts.RequireWindowsBGP && !windowsPresent {
@@ -323,7 +327,13 @@ func VerifyClaimEnvironment(ctx context.Context, c client.Reader, joinProvider s
 	return nil
 }
 
-func checkCalicoMTU(ctx context.Context, c client.Reader, parsedTuple Tuple, tunnelMTU int) CheckResult {
+// ParseCaliVethMTUs parses `ip -o link show` output and returns a map of
+// Calico host veth interface names (cali*) to their current MTU.
+func ParseCaliVethMTUs(ipLinkOutput string) map[string]int {
+	return site.ParseCaliVethMTUs(ipLinkOutput)
+}
+
+func checkCalicoMTU(ctx context.Context, c client.Reader, parsedTuple Tuple, tunnelMTU int, nodeVethMTUs map[string]map[string]int) CheckResult {
 	var ds appsv1.DaemonSet
 	if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: LinuxDaemonSetName}, &ds); err != nil {
 		return CheckResult{Name: "calico-mtu", Pass: false, Detail: fmt.Sprintf("read kube-system/calico-node: %v", err)}
@@ -388,6 +398,33 @@ func checkCalicoMTU(ctx context.Context, c client.Reader, parsedTuple Tuple, tun
 			"site Calico pod MTU (%d) exceeds WireGuard tunnel MTU (%d); aws-node clamps aws-vpc cloud-worker pods to %d while site pods use %d",
 			cniMTU, tunnelMTU, tunnelMTU, cniMTU,
 		))
+	}
+	if len(nodeVethMTUs) > 0 {
+		var nodeNames []string
+		for n := range nodeVethMTUs {
+			nodeNames = append(nodeNames, n)
+		}
+		sort.Strings(nodeNames)
+		for _, nodeName := range nodeNames {
+			veths := nodeVethMTUs[nodeName]
+			staleCounts := map[int]int{}
+			for _, vMTU := range veths {
+				if vMTU != cniMTU {
+					staleCounts[vMTU]++
+				}
+			}
+			var staleMTUs []int
+			for m := range staleCounts {
+				staleMTUs = append(staleMTUs, m)
+			}
+			sort.Ints(staleMTUs)
+			for _, m := range staleMTUs {
+				warnings = append(warnings, fmt.Sprintf(
+					"node %s has %d live cali* veth interface(s) at stale MTU %d != CNI MTU %d (existing pods retain pre-update veth MTU; run 'platform-tuple fix' to clamp in-place without pod restarts)",
+					nodeName, staleCounts[m], m, cniMTU,
+				))
+			}
+		}
 	}
 	return CheckResult{
 		Name:     "calico-mtu",
@@ -549,6 +586,44 @@ func checkWindowsBGP(ctx context.Context, c client.Reader, dualStack bool) Check
 	return CheckResult{Name: "windows-bgp", Pass: true, Detail: "calico-windows-config-actual, IPAMConfig/default, and calico-node-windows verified"}
 }
 
+func checkCalicoIPAM(ctx context.Context, c client.Reader, strict bool) CheckResult {
+	ipam := &unstructured.Unstructured{}
+	ipam.SetGroupVersionKind(schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPAMConfig"})
+	if err := c.Get(ctx, types.NamespacedName{Name: "default"}, ipam); err != nil {
+		if strict {
+			return CheckResult{Name: "calico-ipam", Pass: false, Detail: fmt.Sprintf("missing IPAMConfig/default: %v", err)}
+		}
+		return CheckResult{
+			Name:     "calico-ipam",
+			Pass:     true,
+			Status:   "WARN",
+			Detail:   fmt.Sprintf("missing IPAMConfig/default: %v", err),
+			Warnings: []string{"IPAMConfig/default is not present; run 'platform-tuple fix' to set spec.strictAffinity=true and spec.autoAllocateBlocks=true"},
+		}
+	}
+	var bad []string
+	for _, field := range []string{"strictAffinity", "autoAllocateBlocks"} {
+		val, found, _ := unstructured.NestedBool(ipam.Object, "spec", field)
+		if !found || !val {
+			bad = append(bad, fmt.Sprintf("spec.%s=%v", field, val))
+		}
+	}
+	if len(bad) > 0 {
+		detail := fmt.Sprintf("IPAMConfig/default has %s (want strictAffinity=true, autoAllocateBlocks=true)", strings.Join(bad, ", "))
+		if strict {
+			return CheckResult{Name: "calico-ipam", Pass: false, Detail: detail}
+		}
+		return CheckResult{
+			Name:     "calico-ipam",
+			Pass:     true,
+			Status:   "WARN",
+			Detail:   detail,
+			Warnings: []string{detail + "; unencapsulated Calico BGP requires strictAffinity=true so pods never borrow IPs across nodes (run 'platform-tuple fix')"},
+		}
+	}
+	return CheckResult{Name: "calico-ipam", Pass: true, Detail: "IPAMConfig/default strictAffinity=true autoAllocateBlocks=true"}
+}
+
 func checkSiteCNIExclusion(ctx context.Context, c client.Reader, network cni.Network, parsedTuple Tuple, windowsPresent bool) CheckResult {
 	var ds appsv1.DaemonSet
 	if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: LinuxDaemonSetName}, &ds); err != nil {
@@ -562,8 +637,29 @@ func checkSiteCNIExclusion(ctx context.Context, c client.Reader, network cni.Net
 			hasWindowsExclusion = daemonSetExcludesCloudRole(&winDS)
 		}
 	}
+	var wildcardWarnings []string
+	var allDS appsv1.DaemonSetList
+	if err := c.List(ctx, &allDS); err == nil {
+		for i := range allDS.Items {
+			item := &allDS.Items[i]
+			if item.Namespace == "kube-system" || item.Labels[platform.ComponentLabel] != "" {
+				continue
+			}
+			if daemonSetToleratesAllTaints(item) && !daemonSetExcludesCloudRole(item) {
+				wildcardWarnings = append(wildcardWarnings, fmt.Sprintf(
+					"DaemonSet %s/%s has a wildcard taint toleration (operator=Exists) without excluding %s=%s; it will schedule onto remote WAN cloud workers unless excluded (run 'platform-tuple fix')",
+					item.Namespace, item.Name, platform.RoleLabel, platform.RoleValue,
+				))
+			}
+		}
+	}
 	if hasLinuxExclusion && hasWindowsExclusion {
-		return CheckResult{Name: "site-cni-exclusion", Pass: true, Detail: "site CNI DaemonSets exclude cloud-worker and native CNI nodes"}
+		return CheckResult{
+			Name:     "site-cni-exclusion",
+			Pass:     true,
+			Detail:   "site CNI DaemonSets exclude cloud-worker and native CNI nodes",
+			Warnings: wildcardWarnings,
+		}
 	}
 	// If no cloud-worker nodes are present yet, site.Excluder will reconcile
 	// the nodeAffinity on endpoint-controller startup.
@@ -587,12 +683,23 @@ func checkSiteCNIExclusion(ctx context.Context, c client.Reader, network cni.Net
 			}
 		}
 	}
+	warnings := append([]string{"site CNI DaemonSets do not yet exclude cloud-worker via nodeAffinity; endpoint-controller Excluder or 'platform-tuple fix' will reconcile this before cloud workers join"}, wildcardWarnings...)
 	return CheckResult{
 		Name:     "site-cni-exclusion",
 		Pass:     true,
 		Detail:   "no cloud-worker nodes present yet; endpoint-controller Excluder will apply nodeAffinity",
-		Warnings: []string{"site CNI DaemonSets do not yet exclude cloud-worker via nodeAffinity; endpoint-controller Excluder or 'platform-tuple fix' will reconcile this before cloud workers join"},
+		Warnings: warnings,
 	}
+}
+
+func daemonSetToleratesAllTaints(ds *appsv1.DaemonSet) bool {
+	for _, t := range ds.Spec.Template.Spec.Tolerations {
+		if t.Operator == corev1.TolerationOpExists && strings.TrimSpace(t.Key) == "" &&
+			(t.Effect == "" || t.Effect == corev1.TaintEffectNoSchedule) {
+			return true
+		}
+	}
+	return false
 }
 
 func daemonSetExcludesCloudRole(ds *appsv1.DaemonSet) bool {
@@ -1054,9 +1161,13 @@ func checkManifests(files [][]byte, parsedTuple Tuple) CheckResult {
 				var dep appsv1.Deployment
 				rawJSON, err := json.Marshal(obj)
 				if err == nil && json.Unmarshal(rawJSON, &dep) == nil {
-					if w := inspectCloudWorkerDeployment(&dep); w != "" {
+					if w := inspectSingleNodeHostPortDeployment(&dep); w != "" {
 						warnings = append(warnings, w)
 					}
+				}
+			case "NginxProxy":
+				if w := inspectNginxProxyHostPort(u); w != "" {
+					warnings = append(warnings, w)
 				}
 			}
 		}
@@ -1075,30 +1186,33 @@ func checkCloudWorkerWorkloads(ctx context.Context, c client.Reader) (CheckResul
 		return CheckResult{}, false
 	}
 	var warnings []string
-	var cloudCount int
+	var inspectedCount int
 	for i := range deps.Items {
 		dep := &deps.Items[i]
-		if !targetsCloudWorkers(dep) {
+		if !targetsCloudWorkersOrSingleNode(dep) {
 			continue
 		}
-		cloudCount++
-		if w := inspectCloudWorkerDeployment(dep); w != "" {
+		inspectedCount++
+		if w := inspectSingleNodeHostPortDeployment(dep); w != "" {
 			warnings = append(warnings, w)
 		}
 	}
-	if cloudCount == 0 && len(warnings) == 0 {
+	if inspectedCount == 0 && len(warnings) == 0 {
 		return CheckResult{}, false
 	}
 	return CheckResult{
 		Name:     "cloud-worker-workloads",
 		Pass:     true,
-		Detail:   fmt.Sprintf("inspected %d cloud-worker Deployment(s)", cloudCount),
+		Detail:   fmt.Sprintf("inspected %d single-node/cloud-worker Deployment(s)", inspectedCount),
 		Warnings: warnings,
 	}, true
 }
 
-func targetsCloudWorkers(dep *appsv1.Deployment) bool {
+func targetsCloudWorkersOrSingleNode(dep *appsv1.Deployment) bool {
 	if dep.Spec.Template.Spec.NodeSelector[platform.RoleLabel] == platform.RoleValue {
+		return true
+	}
+	if dep.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] != "" {
 		return true
 	}
 	for _, tol := range dep.Spec.Template.Spec.Tolerations {
@@ -1109,8 +1223,8 @@ func targetsCloudWorkers(dep *appsv1.Deployment) bool {
 	return false
 }
 
-func inspectCloudWorkerDeployment(dep *appsv1.Deployment) string {
-	if !targetsCloudWorkers(dep) {
+func inspectSingleNodeHostPortDeployment(dep *appsv1.Deployment) string {
+	if !targetsCloudWorkersOrSingleNode(dep) {
 		return ""
 	}
 	var hostPorts []int32
@@ -1137,8 +1251,38 @@ func inspectCloudWorkerDeployment(dep *appsv1.Deployment) string {
 	if ns == "" {
 		ns = "default"
 	}
+	target := "cloud-worker"
+	if host := dep.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"]; host != "" && dep.Spec.Template.Spec.NodeSelector[platform.RoleLabel] == "" {
+		target = fmt.Sprintf("single-node (%s)", host)
+	}
 	return fmt.Sprintf(
-		"Deployment %s/%s targets cloud-worker with hostPort %v without strategy.type=Recreate or rollingUpdate.maxSurge=0; rollouts will deadlock on single-instance cloud tiers",
-		ns, dep.Name, hostPorts,
+		"Deployment %s/%s targets %s with hostPort %v without strategy.type=Recreate or rollingUpdate.maxSurge=0; rollouts will deadlock on port conflicts",
+		ns, dep.Name, target, hostPorts,
+	)
+}
+
+func inspectNginxProxyHostPort(u *unstructured.Unstructured) string {
+	if u == nil {
+		return ""
+	}
+	hostPorts, found, _ := unstructured.NestedSlice(u.Object, "spec", "kubernetes", "deployment", "container", "hostPorts")
+	if !found || len(hostPorts) == 0 {
+		return ""
+	}
+	patches, _, _ := unstructured.NestedSlice(u.Object, "spec", "kubernetes", "deployment", "patches")
+	for _, rawPatch := range patches {
+		rawBytes, _ := json.Marshal(rawPatch)
+		s := string(rawBytes)
+		if strings.Contains(s, "Recreate") || strings.Contains(s, `"maxSurge":0`) || strings.Contains(s, `"maxSurge":"0%"`) {
+			return ""
+		}
+	}
+	ns := u.GetNamespace()
+	if ns == "" {
+		ns = "default"
+	}
+	return fmt.Sprintf(
+		"NginxProxy %s/%s configures deployment.container.hostPorts without a StrategicMerge deployment patch setting strategy.type=Recreate; single-node gateway rollouts will deadlock on port 80/443",
+		ns, u.GetName(),
 	)
 }

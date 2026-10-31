@@ -510,7 +510,13 @@ func InspectK0sCalicoConfig(raw []byte, parsedTuple Tuple, tunnelMTU int) ([]str
 			cniMTU, tunnelMTU, tunnelMTU, cniMTU,
 		))
 	}
-	rawStr := string(raw)
+	var nonCommentLines []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			nonCommentLines = append(nonCommentLines, line)
+		}
+	}
+	rawStr := strings.Join(nonCommentLines, "\n")
 	if strings.Contains(rawStr, "vip0") && strings.Contains(rawStr, "/32") {
 		warnings = append(warnings, "k0sctl hooks configure a /32 VIP on vip0; ensure vip0 is outside the IP_AUTODETECTION_METHOD CIDR or excluded via can-reach/interface rules so Calico BIRD never binds to vip0")
 	}

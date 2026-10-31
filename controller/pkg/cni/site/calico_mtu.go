@@ -8,14 +8,36 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var cniConfigMTUPattern = regexp.MustCompile(`("mtu"\s*:\s*)(\d+)`)
+var (
+	cniConfigMTUPattern = regexp.MustCompile(`("mtu"\s*:\s*)(\d+)`)
+	caliVethMTUPattern  = regexp.MustCompile(`(?m)^\d+:\s+(cali[a-zA-Z0-9_-]+)(?:@[^:\s]+)?:\s+<[^>]*>\s+mtu\s+(\d+)\b`)
+)
+
+// ParseCaliVethMTUs parses `ip -o link show` output and returns a map of
+// Calico host veth interface names (cali*) to their current MTU.
+func ParseCaliVethMTUs(ipLinkOutput string) map[string]int {
+	out := map[string]int{}
+	for _, m := range caliVethMTUPattern.FindAllStringSubmatch(ipLinkOutput, -1) {
+		if len(m) != 3 {
+			continue
+		}
+		if mtu, err := strconv.Atoi(m[2]); err == nil && mtu > 0 {
+			out[m[1]] = mtu
+		}
+	}
+	return out
+}
 
 // ReconcileReport summarizes changes applied (or planned) by ReconcileCalicoSite.
 type ReconcileReport struct {
@@ -23,6 +45,10 @@ type ReconcileReport struct {
 	LinuxDaemonSetPatched bool     `json:"linuxDaemonSetPatched,omitempty"`
 	WindowsConfigPatched  bool     `json:"windowsConfigPatched,omitempty"`
 	WindowsDaemonPatched  bool     `json:"windowsDaemonSetPatched,omitempty"`
+	IPAMConfigPatched     bool     `json:"ipamConfigPatched,omitempty"`
+	ExclusionsPatched     bool     `json:"exclusionsPatched,omitempty"`
+	WorkloadsPatched      bool     `json:"workloadsPatched,omitempty"`
+	VethsClamped          int      `json:"vethsClamped,omitempty"`
 	Changes               []string `json:"changes,omitempty"`
 }
 
@@ -231,13 +257,19 @@ func AlignWindowsCalicoDaemonSetMTU(ds *appsv1.DaemonSet, effectiveMTU int) (cha
 }
 
 // ReconcileCalicoSite ensures that the cluster's Linux calico-node DaemonSet,
-// Windows BGP ConfigMap (calico-windows-config-actual), and Windows Calico
-// DaemonSet (calico-node-windows) have aligned MTU and Windows BGP settings.
+// Windows BGP ConfigMap (calico-windows-config-actual), Windows Calico
+// DaemonSet (calico-node-windows), IPAMConfig/default, wildcard-toleration
+// DaemonSets (such as spegel), and single-node hostPort workloads have aligned
+// MTU, BGP IPAM strictAffinity, and cloud-worker exclusions.
 func ReconcileCalicoSite(ctx context.Context, c client.Client, r client.Reader, targetMTU int) (*ReconcileReport, error) {
 	if r == nil {
 		r = c
 	}
 	report := &ReconcileReport{EffectiveMTU: targetMTU}
+	cniReqs := []corev1.NodeSelectorRequirement{
+		Requirement([]string{"aws-vpc"}),
+		cloudWorkers,
+	}
 
 	linuxDS := &appsv1.DaemonSet{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: calicoAgent}, linuxDS)
@@ -253,16 +285,39 @@ func ReconcileCalicoSite(ctx context.Context, c client.Client, r client.Reader, 
 		if effMTU >= 1280 {
 			report.EffectiveMTU = effMTU
 		}
-		if changed && installationOwner(linuxDS) == "" && c != nil {
+		exclChanged := false
+		if !excludes(&patched.Spec.Template.Spec, cniReqs) {
+			exclude(&patched.Spec.Template.Spec, cniReqs)
+			exclChanged = true
+			changes = append(changes, "calico-node nodeAffinity exclude cloud-worker and aws-vpc")
+		}
+		if (changed || exclChanged) && installationOwner(linuxDS) == "" && c != nil {
 			if err := c.Patch(ctx, patched, client.MergeFromWithOptions(linuxDS, client.MergeFromWithOptimisticLock{})); err != nil {
-				return nil, fmt.Errorf("patching kube-system/calico-node MTU: %w", err)
+				return nil, fmt.Errorf("patching kube-system/calico-node: %w", err)
 			}
-			report.LinuxDaemonSetPatched = true
+			if changed {
+				report.LinuxDaemonSetPatched = true
+			}
+			if exclChanged {
+				report.ExclusionsPatched = true
+			}
 			report.Changes = append(report.Changes, changes...)
-		} else if changed && c == nil {
-			report.LinuxDaemonSetPatched = true
+		} else if (changed || exclChanged) && c == nil {
+			if changed {
+				report.LinuxDaemonSetPatched = true
+			}
+			if exclChanged {
+				report.ExclusionsPatched = true
+			}
 			report.Changes = append(report.Changes, changes...)
 		}
+	}
+
+	if ipamChanged, ipamChanges, ipamErr := reconcileIPAMConfigDefault(ctx, c, r); ipamErr != nil {
+		return nil, ipamErr
+	} else if ipamChanged {
+		report.IPAMConfigPatched = true
+		report.Changes = append(report.Changes, ipamChanges...)
 	}
 
 	winCM := &corev1.ConfigMap{}
@@ -290,22 +345,230 @@ func ReconcileCalicoSite(ctx context.Context, c client.Client, r client.Reader, 
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, fmt.Errorf("reading kube-system/calico-node-windows: %w", err)
 	}
-	if err == nil && report.EffectiveMTU >= 1280 {
+	if err == nil {
 		patchedWinDS := winDS.DeepCopy()
-		changed, changes := AlignWindowsCalicoDaemonSetMTU(patchedWinDS, report.EffectiveMTU)
-		if changed && installationOwner(winDS) == "" && c != nil {
+		var changed bool
+		var changes []string
+		if report.EffectiveMTU >= 1280 {
+			changed, changes = AlignWindowsCalicoDaemonSetMTU(patchedWinDS, report.EffectiveMTU)
+		}
+		exclChanged := false
+		if !excludes(&patchedWinDS.Spec.Template.Spec, cniReqs) {
+			exclude(&patchedWinDS.Spec.Template.Spec, cniReqs)
+			exclChanged = true
+			changes = append(changes, "calico-node-windows nodeAffinity exclude cloud-worker and aws-vpc")
+		}
+		if (changed || exclChanged) && installationOwner(winDS) == "" && c != nil {
 			if err := c.Patch(ctx, patchedWinDS, client.MergeFromWithOptions(winDS, client.MergeFromWithOptimisticLock{})); err != nil {
-				return nil, fmt.Errorf("patching kube-system/calico-node-windows MTU: %w", err)
+				return nil, fmt.Errorf("patching kube-system/calico-node-windows: %w", err)
 			}
-			report.WindowsDaemonPatched = true
+			if changed {
+				report.WindowsDaemonPatched = true
+			}
+			if exclChanged {
+				report.ExclusionsPatched = true
+			}
 			report.Changes = append(report.Changes, changes...)
-		} else if changed && c == nil {
-			report.WindowsDaemonPatched = true
+		} else if (changed || exclChanged) && c == nil {
+			if changed {
+				report.WindowsDaemonPatched = true
+			}
+			if exclChanged {
+				report.ExclusionsPatched = true
+			}
 			report.Changes = append(report.Changes, changes...)
 		}
 	}
 
+	if exclChanges, exclErr := reconcileWildcardDaemonSets(ctx, c, r); exclErr != nil {
+		return nil, exclErr
+	} else if len(exclChanges) > 0 {
+		report.ExclusionsPatched = true
+		report.Changes = append(report.Changes, exclChanges...)
+	}
+
+	if wlChanges, wlErr := reconcileSingleNodeHostPortWorkloads(ctx, c, r); wlErr != nil {
+		return nil, wlErr
+	} else if len(wlChanges) > 0 {
+		report.WorkloadsPatched = true
+		report.Changes = append(report.Changes, wlChanges...)
+	}
+
 	return report, nil
+}
+
+func reconcileIPAMConfigDefault(ctx context.Context, c client.Client, r client.Reader) (bool, []string, error) {
+	ipam := &unstructured.Unstructured{}
+	ipam.SetGroupVersionKind(schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPAMConfig"})
+	err := r.Get(ctx, client.ObjectKey{Name: "default"}, ipam)
+	if meta.IsNoMatchError(err) {
+		return false, nil, nil
+	}
+	if apierrors.IsNotFound(err) {
+		return false, nil, nil
+	}
+	if err != nil {
+		return false, nil, fmt.Errorf("reading IPAMConfig/default: %w", err)
+	}
+	strictVal, strictFound, _ := unstructured.NestedBool(ipam.Object, "spec", "strictAffinity")
+	autoVal, autoFound, _ := unstructured.NestedBool(ipam.Object, "spec", "autoAllocateBlocks")
+	if strictFound && strictVal && autoFound && autoVal {
+		return false, nil, nil
+	}
+	patched := ipam.DeepCopy()
+	var changes []string
+	if !strictFound || !strictVal {
+		_ = unstructured.SetNestedField(patched.Object, true, "spec", "strictAffinity")
+		changes = append(changes, fmt.Sprintf("IPAMConfig/default spec.strictAffinity %v -> true", strictVal))
+	}
+	if !autoFound || !autoVal {
+		_ = unstructured.SetNestedField(patched.Object, true, "spec", "autoAllocateBlocks")
+		changes = append(changes, fmt.Sprintf("IPAMConfig/default spec.autoAllocateBlocks %v -> true", autoVal))
+	}
+	if c != nil {
+		if err := c.Patch(ctx, patched, client.MergeFromWithOptions(ipam, client.MergeFromWithOptimisticLock{})); err != nil {
+			return false, nil, fmt.Errorf("patching IPAMConfig/default: %w", err)
+		}
+	}
+	return true, changes, nil
+}
+
+func reconcileWildcardDaemonSets(ctx context.Context, c client.Client, r client.Reader) ([]string, error) {
+	var allDS appsv1.DaemonSetList
+	if err := r.List(ctx, &allDS); err != nil {
+		return nil, nil
+	}
+	reqs := []corev1.NodeSelectorRequirement{cloudWorkers}
+	var changes []string
+	for i := range allDS.Items {
+		ds := &allDS.Items[i]
+		if ds.Namespace == "kube-system" || ds.Labels[platform.ComponentLabel] != "" {
+			continue
+		}
+		toleratesAll := false
+		for _, t := range ds.Spec.Template.Spec.Tolerations {
+			if t.Operator == corev1.TolerationOpExists && strings.TrimSpace(t.Key) == "" &&
+				(t.Effect == "" || t.Effect == corev1.TaintEffectNoSchedule) {
+				toleratesAll = true
+				break
+			}
+		}
+		if !toleratesAll || excludes(&ds.Spec.Template.Spec, reqs) {
+			continue
+		}
+		patched := ds.DeepCopy()
+		exclude(&patched.Spec.Template.Spec, reqs)
+		if c != nil {
+			if err := c.Patch(ctx, patched, client.MergeFromWithOptions(ds, client.MergeFromWithOptimisticLock{})); err != nil {
+				return nil, fmt.Errorf("excluding cloud-worker from DaemonSet %s/%s: %w", ds.Namespace, ds.Name, err)
+			}
+		}
+		changes = append(changes, fmt.Sprintf("DaemonSet %s/%s nodeAffinity exclude cloud-worker", ds.Namespace, ds.Name))
+	}
+	return changes, nil
+}
+
+func reconcileSingleNodeHostPortWorkloads(ctx context.Context, c client.Client, r client.Reader) ([]string, error) {
+	var changes []string
+
+	// 1. Reconcile NginxProxy CRs (gateway.nginx.org/v1alpha2) if served.
+	npList := &unstructured.UnstructuredList{}
+	npList.SetGroupVersionKind(schema.GroupVersionKind{Group: "gateway.nginx.org", Version: "v1alpha2", Kind: "NginxProxyList"})
+	if err := r.List(ctx, npList); err == nil {
+		for i := range npList.Items {
+			np := &npList.Items[i]
+			hostPorts, found, _ := unstructured.NestedSlice(np.Object, "spec", "kubernetes", "deployment", "container", "hostPorts")
+			if !found || len(hostPorts) == 0 {
+				continue
+			}
+			patches, _, _ := unstructured.NestedSlice(np.Object, "spec", "kubernetes", "deployment", "patches")
+			hasRecreate := false
+			for _, rawPatch := range patches {
+				b, _ := json.Marshal(rawPatch)
+				if strings.Contains(string(b), "Recreate") || strings.Contains(string(b), `"maxSurge":0`) {
+					hasRecreate = true
+					break
+				}
+			}
+			if hasRecreate {
+				continue
+			}
+			patched := np.DeepCopy()
+			recreatePatch := map[string]interface{}{
+				"type": "StrategicMerge",
+				"value": map[string]interface{}{
+					"spec": map[string]interface{}{
+						"strategy": map[string]interface{}{
+							"type":          "Recreate",
+							"rollingUpdate": nil,
+						},
+					},
+				},
+			}
+			patches = append(patches, recreatePatch)
+			if err := unstructured.SetNestedSlice(patched.Object, patches, "spec", "kubernetes", "deployment", "patches"); err != nil {
+				return nil, err
+			}
+			if c != nil {
+				if err := c.Patch(ctx, patched, client.MergeFromWithOptions(np, client.MergeFromWithOptimisticLock{})); err != nil {
+					return nil, fmt.Errorf("patching NginxProxy %s/%s: %w", np.GetNamespace(), np.GetName(), err)
+				}
+			}
+			changes = append(changes, fmt.Sprintf("NginxProxy %s/%s added StrategicMerge deployment patch strategy.type=Recreate", np.GetNamespace(), np.GetName()))
+		}
+	}
+
+	// 2. Reconcile single-node / cloud-worker hostPort Deployments.
+	var deps appsv1.DeploymentList
+	if err := r.List(ctx, &deps); err != nil {
+		return changes, nil
+	}
+	for i := range deps.Items {
+		dep := &deps.Items[i]
+		singleNode := dep.Spec.Template.Spec.NodeSelector[platform.RoleLabel] == platform.RoleValue ||
+			dep.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] != ""
+		if !singleNode {
+			for _, tol := range dep.Spec.Template.Spec.Tolerations {
+				if tol.Key == "cloud-provisioning.appmana.com/cloud-worker" || tol.Key == platform.RoleLabel {
+					singleNode = true
+					break
+				}
+			}
+		}
+		if !singleNode {
+			continue
+		}
+		hasHostPort := false
+		for _, container := range dep.Spec.Template.Spec.Containers {
+			for _, p := range container.Ports {
+				if p.HostPort > 0 {
+					hasHostPort = true
+					break
+				}
+			}
+		}
+		if !hasHostPort || dep.Spec.Strategy.Type == appsv1.RecreateDeploymentStrategyType {
+			continue
+		}
+		if dep.Spec.Strategy.RollingUpdate != nil && dep.Spec.Strategy.RollingUpdate.MaxSurge != nil {
+			ms := dep.Spec.Strategy.RollingUpdate.MaxSurge.String()
+			if ms == "0" || ms == "0%" {
+				continue
+			}
+		}
+		patched := dep.DeepCopy()
+		patched.Spec.Strategy = appsv1.DeploymentStrategy{
+			Type:          appsv1.RecreateDeploymentStrategyType,
+			RollingUpdate: nil,
+		}
+		if c != nil {
+			if err := c.Patch(ctx, patched, client.MergeFromWithOptions(dep, client.MergeFromWithOptimisticLock{})); err != nil {
+				return nil, fmt.Errorf("patching Deployment %s/%s strategy: %w", dep.Namespace, dep.Name, err)
+			}
+		}
+		changes = append(changes, fmt.Sprintf("Deployment %s/%s strategy.type RollingUpdate -> Recreate", dep.Namespace, dep.Name))
+	}
+	return changes, nil
 }
 
 // ensureCalicoAlignment reconciles MTU and Windows BGP ConfigMap alignment on a
@@ -327,6 +590,11 @@ func (e *Excluder) ensureCalicoAlignment(ctx context.Context, ds *appsv1.DaemonS
 			}
 			*ds = *patched
 			logf.FromContext(ctx).Info("aligned site Calico MTU", "daemonSet", client.ObjectKeyFromObject(ds), "effectiveMTU", effMTU, "changes", changes)
+		}
+		if ipamChanged, ipamChanges, ipamErr := reconcileIPAMConfigDefault(ctx, e.Client, e.Reader); ipamErr != nil {
+			return ipamErr
+		} else if ipamChanged {
+			logf.FromContext(ctx).Info("reconciled IPAMConfig/default", "changes", ipamChanges)
 		}
 		if effMTU >= 1280 {
 			winCM := &corev1.ConfigMap{}

@@ -1,0 +1,155 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DiscoverAndInspectEC2",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ec2:GetSecurityGroupsForVpc",
+        "ec2:GetConsoleOutput",
+        "ec2:GetConsoleScreenshot",
+        "tag:GetResources"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LaunchCAPIMachinesInAnyCluster",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*::image/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:subnet/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:security-group/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:key-pair/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:launch-template/*"
+      ]
+    },
+    {
+      "Sid": "CreateCAPIManagedInstancesVolumesAndENIs",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:instance/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:volume/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/sigs.k8s.io/cluster-api-provider-aws/managed": "true"
+        }
+      }
+    },
+    {
+      "Sid": "TagCAPIMachinesOnCreate",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:instance/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:volume/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": "RunInstances",
+          "aws:RequestTag/sigs.k8s.io/cluster-api-provider-aws/managed": "true"
+        }
+      }
+    },
+    {
+      "Sid": "ManageCAPIOwnedResourcesAcrossAllClusters",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:TerminateInstances",
+        "ec2:StopInstances",
+        "ec2:StartInstances",
+        "ec2:RebootInstances",
+        "ec2:ModifyInstanceAttribute",
+        "ec2:ModifyInstanceMetadataOptions",
+        "ec2:ModifyNetworkInterfaceAttribute",
+        "ec2:AttachNetworkInterface",
+        "ec2:DetachNetworkInterface",
+        "ec2:AssignIpv6Addresses",
+        "ec2:UnassignIpv6Addresses",
+        "ec2:AssignPrivateIpAddresses",
+        "ec2:UnassignPrivateIpAddresses",
+        "ec2:CreateTags",
+        "ec2:DeleteTags",
+        "ec2:DeleteVolume"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:instance/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:volume/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/sigs.k8s.io/cluster-api-provider-aws/managed": "true"
+        }
+      }
+    },
+    {
+      "Sid": "PassCAPINodeRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::${AWS_ACCOUNT_ID}:role/*.cluster-api-provider-aws.sigs.k8s.io",
+        "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${NODE_ROLE_NAME}"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ReadCAPIInstanceProfiles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetInstanceProfile"
+      ],
+      "Resource": [
+        "arn:aws:iam::${AWS_ACCOUNT_ID}:instance-profile/*.cluster-api-provider-aws.sigs.k8s.io",
+        "arn:aws:iam::${AWS_ACCOUNT_ID}:instance-profile/${INSTANCE_PROFILE_NAME}"
+      ]
+    },
+    {
+      "Sid": "ManageCAPIBootstrapSecrets",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:TagResource",
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:PutSecretValue"
+      ],
+      "Resource": "arn:aws:secretsmanager:*:${AWS_ACCOUNT_ID}:secret:aws.cluster.x-k8s.io/*"
+    },
+    {
+      "Sid": "CreateSpotAndAutoScalingServiceLinkedRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateServiceLinkedRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::${AWS_ACCOUNT_ID}:role/aws-service-role/spot.amazonaws.com/AWSServiceRoleForEC2Spot",
+        "arn:aws:iam::${AWS_ACCOUNT_ID}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+      ],
+      "Condition": {
+        "StringLike": {
+          "iam:AWSServiceName": [
+            "spot.amazonaws.com",
+            "autoscaling.amazonaws.com"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -2568,6 +2568,7 @@ func main() {
 	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	awsIAMBootstrap := flag.Bool("aws-iam-bootstrap", false, "reconcile AWS IAM policies, roles, and instance profile at startup using current AWS credentials")
+	awsIAMScope := flag.String("aws-iam-scope", "account", "IAM scope when --aws-iam-bootstrap is enabled: 'account' (shared clusterawsadm roles + AWS-Managed Policies) or 'cluster'")
 	awsIAMTuple := flag.String("aws-iam-tuple", "k0s + calico,bgp + aws", "platform tuple expression used when --aws-iam-bootstrap is enabled")
 	awsIAMCluster := flag.String("aws-iam-cluster", "", "optional CAPI cluster name override when --aws-iam-bootstrap is enabled")
 	awsIAMRegion := flag.String("aws-iam-region", "", "optional AWS region override when --aws-iam-bootstrap is enabled")
@@ -2748,6 +2749,7 @@ func main() {
 		}
 		report, _, err := tuple.ApplyIAMBundle(iamCtx, iamClient, mgr.GetClient(), mgr.GetAPIReader(), tuple.IAMConfig{
 			Tuple:                 *awsIAMTuple,
+			Scope:                 *awsIAMScope,
 			AccountID:             acct,
 			Region:                *awsIAMRegion,
 			ClusterName:           *awsIAMCluster,
@@ -3252,6 +3254,7 @@ func runAWSIAMCommand(args []string, out, diagnostics io.Writer) int {
 	fs.SetOutput(diagnostics)
 	var cfg tuple.IAMConfig
 	fs.StringVar(&cfg.Tuple, "tuple", "k0s + calico,bgp + aws", "platform tuple expression")
+	fs.StringVar(&cfg.Scope, "scope", "account", "IAM scope: 'account' (shared clusterawsadm roles + AWS-Managed Policies across all clusters) or 'cluster' (isolated per-cluster roles)")
 	fs.StringVar(&cfg.AccountID, "account-id", "", "AWS 12-digit account ID (auto-detected via STS when omitted)")
 	fs.StringVar(&cfg.Region, "region", "", "AWS region (auto-discovered from AWSCluster when --kubeconfig is set)")
 	fs.StringVar(&cfg.ClusterName, "cluster", "", "CAPI cluster name (auto-discovered from AWSCluster when --kubeconfig is set)")

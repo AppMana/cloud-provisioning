@@ -1310,3 +1310,72 @@ EC2 dry run establishes authorization, not capacity availability or KVM support
 inside the guest. Retain instance identity immediately after launch, bound the
 campaign duration, and remove its owned instance and volumes after collecting
 evidence.
+
+## Account-wide vs. per-cluster IAM policy and role management
+
+To avoid creating and maintaining duplicate IAM roles and policies for every
+cluster in an AWS account, `cloud-provisioning` defaults to **Account-Wide Shared
+CAPI Mode (`--scope=account`)**, following the upstream CAPA (`clusterawsadm`)
+naming convention (`*.cluster-api-provider-aws.sigs.k8s.io`) and attaching
+official **AWS-Managed Policies** alongside three small Customer Managed delta
+policies.
+
+### 1. Official AWS-Managed Policies used
+
+| AWS-Managed Policy ARN | Attached To | What AWS Maintains For Us |
+|---|---|---|
+| `arn:aws:iam::aws:policy/AmazonEKSVPCResourceController` | `controllers.cluster-api-provider-aws.sigs.k8s.io` | Windows VPC CNI IPAM (`AssignPrivateIpAddresses`, `UnassignPrivateIpAddresses`, ENI attachment/modification, EC2/ASG/Tag inspection) |
+| `arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy` | `nodes.cluster-api-provider-aws.sigs.k8s.io` | Linux & Windows worker IPv4 VPC CNI (`AssignPrivateIpAddresses`, `AttachNetworkInterface`, `CreateNetworkInterface`, `Describe*`, `CreateTags`) |
+| `arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly` | `nodes.cluster-api-provider-aws.sigs.k8s.io` | Pulling container images from private ECR repositories |
+| `arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore` | `nodes.cluster-api-provider-aws.sigs.k8s.io`, `ami-operator.cluster-api-provider-aws.sigs.k8s.io` | Systems Manager Session Manager, Fleet Manager, and `RunCommand` guest agent telemetry |
+| `arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy` | `nodes.cluster-api-provider-aws.sigs.k8s.io` | Worker CloudWatch Logs, Metrics, and X-Ray telemetry |
+| `arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder` | `ami-operator.cluster-api-provider-aws.sigs.k8s.io` | AMI creation (`CreateImage`, `RegisterImage`, `CopyImage`, `ModifyImageAttribute`, `CreateSnapshot`, EBS snapshot block APIs) |
+
+### 2. Account-wide shared roles and Customer Managed delta policies (`--scope=account`, default)
+
+Because CAPA stamps `sigs.k8s.io/cluster-api-provider-aws/managed = "true"` on
+every EC2 instance, EBS volume, ENI, and `aws.cluster.x-k8s.io/*` bootstrap
+secret across all CAPI clusters, one set of roles in the AWS account safely
+serves all clusters without per-cluster `${CLUSTER_NAME}`, `${SUBNET_ID}`, or
+`${AMI_ID}` policy edits:
+
+| Role / Instance Profile | Customer Managed Delta Policy (`docs/iam/` & `controller/pkg/platform/aws/iam/policies/`) | Purpose |
+|---|---|---|
+| `controllers.cluster-api-provider-aws.sigs.k8s.io` | [`account-controllers.json`](iam/account-controllers.json) | CAPA + `endpoint-controller` EC2 launch/terminate/tag lifecycle conditioned on `sigs.k8s.io/cluster-api-provider-aws/managed = "true"`, `aws.cluster.x-k8s.io/*` Secrets Manager bootstrap secrets, `iam:PassRole` for `*.cluster-api-provider-aws.sigs.k8s.io`, and Spot/ASG Service-Linked Roles |
+| `nodes.cluster-api-provider-aws.sigs.k8s.io` (Role + Instance Profile) | [`account-nodes.json`](iam/account-nodes.json) | Worker consumption/deletion of `aws.cluster.x-k8s.io/*` bootstrap secrets (`cloud-init` / `EC2Launch v2`) and IPv6 `/80` prefix delegation (`ec2:AssignIpv6Addresses`) on CAPI-managed ENIs |
+| `ami-operator.cluster-api-provider-aws.sigs.k8s.io` | [`account-ami-operator.json`](iam/account-ami-operator.json) | Windows EC2 Fast Launch (`ec2:EnableFastLaunch`, `fastlaunch.ec2.amazonaws.com` SLR), EBS builder volume resizing (`ec2:ModifyVolume`), `s3://ec2-windows-nvidia-drivers` read access, and EC2 serial/screenshot/SSM diagnostics (`ec2:GetConsoleOutput`, `ec2:GetConsoleScreenshot`, `ssm:GetCommandInvocation`) |
+
+### 3. Per-cluster isolated mode (`--scope=cluster`)
+
+When strict per-cluster blast-radius isolation is required (`sigs.k8s.io/cluster-api-provider-aws/cluster/<cluster>: owned`), pass `--scope=cluster --cluster=<cluster-name>` to render and reconcile cluster-prefixed policies and roles (`<cluster>-capa-controller`, `<cluster>-endpoint-controller`, `<cluster>-worker-node`, `<cluster>-ami-operator`) from the granular templates in [`docs/iam/`](iam/):
+- [`capa-provisioning.json`](iam/capa-provisioning.json)
+- [`worker-bootstrap.json`](iam/worker-bootstrap.json)
+- [`vpc-cni-node-ipv4.json`](iam/vpc-cni-node-ipv4.json) & [`vpc-cni-node-ipv6.json`](iam/vpc-cni-node-ipv6.json)
+- [`controller.json`](iam/controller.json) & [`controller-artifacts.json`](iam/controller-artifacts.json)
+- [`ami-lifecycle.json`](iam/ami-lifecycle.json) & [`ami-performance.json`](iam/ami-performance.json)
+- [`worker-observability.json`](iam/worker-observability.json) & [`operator-observability.json`](iam/operator-observability.json)
+
+### 4. Applying IAM policies and roles at installation time
+
+All three installation workflows use the same embedded Go reconciler
+([`controller/pkg/platform/aws/iam`](../controller/pkg/platform/aws/iam)):
+
+1. **Developer CLI (`platform-tuple` or `endpoint-controller iam`)**:
+   ```sh
+   # Preview the account-wide bundle (JSON):
+   go run ./cmd/platform-tuple iam-render \
+     --tuple "k0s + calico,bgp,windows + aws,aws-vpc" \
+     --aws-iam-scope account
+
+   # Reconcile policies, roles, instance profile, and Kubernetes AWSClusterRoleIdentity once per AWS account:
+   go run ./cmd/platform-tuple iam-apply \
+     --tuple "k0s + calico,bgp,windows + aws,aws-vpc" \
+     --aws-iam-scope account \
+     --kubeconfig ~/.kube/config \
+     --aws-cluster-role-identity default
+   ```
+2. **Helm `pre-install,pre-upgrade` Hook Job**:
+   Set `aws.iamBootstrap.enabled=true` (and `aws.iamBootstrap.scope="account"`) in `values.yaml`. Before starting the controller Deployment, Helm runs `endpoint-controller iam apply` using the setup credentials Secret (`aws.iamBootstrap.secretName`).
+3. **Controller Startup Flag (`--aws-iam-bootstrap`)**:
+   Pass `--aws-iam-bootstrap --aws-iam-scope=account` to `endpoint-controller` to reconcile the IAM bundle on startup before starting the manager loops.
+

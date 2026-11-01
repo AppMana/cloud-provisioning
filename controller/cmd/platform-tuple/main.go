@@ -92,6 +92,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	timeout := fs.Duration("timeout", 30*time.Second, "API request timeout")
 
 	var iamCfg tuple.IAMConfig
+	fs.StringVar(&iamCfg.Scope, "aws-iam-scope", "account", "IAM scope: 'account' (shared clusterawsadm roles + AWS-Managed Policies across all clusters) or 'cluster' (isolated per-cluster roles)")
 	fs.StringVar(&iamCfg.AccountID, "aws-account-id", "", "AWS 12-digit account ID (auto-detected via STS in iam-apply when omitted)")
 	fs.StringVar(&iamCfg.Region, "aws-region", "", "AWS region for IAM policy scoping (auto-discovered from AWSCluster when --kubeconfig is set)")
 	fs.StringVar(&iamCfg.ClusterName, "aws-cluster", "", "CAPI cluster name for IAM tag scoping (auto-discovered from AWSCluster when --kubeconfig is set)")

@@ -101,6 +101,62 @@ func TestRenderFullLinuxWindowsVPCCNIAMIObservabilityBundle(t *testing.T) {
 	}
 }
 
+func TestRenderAccountWideCAPIBundleWithAWSManagedPolicies(t *testing.T) {
+	bundle, err := Render(Options{
+		Scope:                 "account",
+		AccountID:             "123456789012",
+		IncludeWindows:        true,
+		IncludeVPCCNI:         true,
+		IncludeAMILifecycle:   true,
+		IncludeAMIPerformance: true,
+		IncludeObservability:  true,
+	})
+	if err != nil {
+		t.Fatalf("Render(account): %v", err)
+	}
+	if bundle.Scope != "account" {
+		t.Fatalf("expected scope=account, got %q", bundle.Scope)
+	}
+	if len(bundle.Policies) != 3 {
+		t.Fatalf("expected 3 customer-managed delta policies in account-wide bundle, got %d", len(bundle.Policies))
+	}
+	for _, pol := range bundle.Policies {
+		if pol.CompactSize > ManagedPolicyLimitBytes {
+			t.Errorf("policy %s compact size %d > %d", pol.Name, pol.CompactSize, ManagedPolicyLimitBytes)
+		}
+	}
+	if bundle.InstanceProfile.Name != AccountNodesRoleName {
+		t.Errorf("expected clusterawsadm instance profile %s, got %s", AccountNodesRoleName, bundle.InstanceProfile.Name)
+	}
+	var ctrlRole, nodeRole, amiRole RoleSpec
+	for _, r := range bundle.Roles {
+		switch r.Name {
+		case AccountControllersRoleName:
+			ctrlRole = r
+		case AccountNodesRoleName:
+			nodeRole = r
+		case AccountAMIOperatorRoleName:
+			amiRole = r
+		}
+	}
+	if !slices.Contains(ctrlRole.ManagedPolicyARNs, AWSManagedWindowsVPCResourceControllerARN) {
+		t.Errorf("expected controllers role to attach %s, got %v", AWSManagedWindowsVPCResourceControllerARN, ctrlRole.ManagedPolicyARNs)
+	}
+	for _, wantARN := range []string{
+		AWSManagedVPCCNIPolicyARN,
+		AWSManagedECRReadOnlyARN,
+		SSMManagedInstanceCoreARN,
+		AWSManagedCloudWatchAgentARN,
+	} {
+		if !slices.Contains(nodeRole.ManagedPolicyARNs, wantARN) {
+			t.Errorf("expected nodes role to attach AWS-Managed Policy %s, got %v", wantARN, nodeRole.ManagedPolicyARNs)
+		}
+	}
+	if !slices.Contains(amiRole.ManagedPolicyARNs, AWSManagedImageBuilderARN) {
+		t.Errorf("expected ami-operator role to attach %s, got %v", AWSManagedImageBuilderARN, amiRole.ManagedPolicyARNs)
+	}
+}
+
 type fakeIAM struct {
 	policies         map[string]string
 	policyVersions   map[string][]PolicyVersion
@@ -298,7 +354,7 @@ func TestDiscoverOptionsAndReconcileClusterRoleIdentity(t *testing.T) {
 			"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
 			"kind":       "AWSCluster",
 			"metadata": map[string]any{
-				"name":      "hilton-aws",
+				"name":      "site-aws",
 				"namespace": "cloud-provisioning",
 			},
 			"spec": map[string]any{
@@ -323,7 +379,7 @@ func TestDiscoverOptionsAndReconcileClusterRoleIdentity(t *testing.T) {
 				"template": map[string]any{
 					"spec": map[string]any{
 						"ami":                map[string]any{"id": "ami-0abcdef"},
-						"iamInstanceProfile": "hilton-aws-worker",
+						"iamInstanceProfile": "site-aws-worker",
 						"additionalSecurityGroups": []any{
 							map[string]any{"id": "sg-098765"},
 						},
@@ -338,27 +394,27 @@ func TestDiscoverOptionsAndReconcileClusterRoleIdentity(t *testing.T) {
 	if err := DiscoverOptionsFromCluster(ctx, cl, &opts); err != nil {
 		t.Fatalf("DiscoverOptionsFromCluster: %v", err)
 	}
-	if opts.ClusterName != "hilton-aws" || opts.Region != "us-west-2" {
+	if opts.ClusterName != "site-aws" || opts.Region != "us-west-2" {
 		t.Errorf("unexpected discovered cluster/region: %+v", opts)
 	}
 	if !slices.Contains(opts.Subnets, "subnet-012345") || !slices.Contains(opts.AMIs, "ami-0abcdef") || !slices.Contains(opts.SecurityGroups, "sg-098765") {
 		t.Errorf("unexpected discovered subnets/AMIs/SGs: %+v", opts)
 	}
-	if opts.InstanceProfileName != "hilton-aws-worker" {
-		t.Errorf("expected discovered instanceProfileName hilton-aws-worker, got %s", opts.InstanceProfileName)
+	if opts.InstanceProfileName != "site-aws-worker" {
+		t.Errorf("expected discovered instanceProfileName site-aws-worker, got %s", opts.InstanceProfileName)
 	}
 
-	changed, err := ReconcileAWSClusterRoleIdentity(ctx, cl, cl, "hilton-capa-role", "arn:aws:iam::123456789012:role/hilton-aws-capa-controller", "aws-static-creds", "cloud-provisioning", false)
+	changed, err := ReconcileAWSClusterRoleIdentity(ctx, cl, cl, "site-capa-role", "arn:aws:iam::123456789012:role/site-aws-capa-controller", "aws-static-creds", "cloud-provisioning", false)
 	if err != nil || !changed {
 		t.Fatalf("ReconcileAWSClusterRoleIdentity: changed=%v err=%v", changed, err)
 	}
 	identity := &unstructured.Unstructured{}
 	identity.SetGroupVersionKind(schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterRoleIdentity"})
-	if err := cl.Get(ctx, client.ObjectKey{Name: "hilton-capa-role"}, identity); err != nil {
+	if err := cl.Get(ctx, client.ObjectKey{Name: "site-capa-role"}, identity); err != nil {
 		t.Fatalf("getting created AWSClusterRoleIdentity: %v", err)
 	}
 	roleARN, _, _ := unstructured.NestedString(identity.Object, "spec", "roleARN")
-	if roleARN != "arn:aws:iam::123456789012:role/hilton-aws-capa-controller" {
+	if roleARN != "arn:aws:iam::123456789012:role/site-aws-capa-controller" {
 		t.Errorf("unexpected roleARN %s", roleARN)
 	}
 }

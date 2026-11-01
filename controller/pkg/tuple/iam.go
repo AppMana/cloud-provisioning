@@ -13,6 +13,7 @@ import (
 // tuple's AWS IAM policies, roles, and instance profile.
 type IAMConfig struct {
 	Tuple                 string
+	Scope                 string
 	AccountID             string
 	Region                string
 	ClusterName           string
@@ -52,6 +53,7 @@ func BuildIAMOptions(ctx context.Context, reader client.Reader, cfg IAMConfig) (
 		fam = "dual"
 	}
 	opts := awsiam.Options{
+		Scope:                 cfg.Scope,
 		AccountID:             cfg.AccountID,
 		Region:                cfg.Region,
 		ClusterName:           cfg.ClusterName,

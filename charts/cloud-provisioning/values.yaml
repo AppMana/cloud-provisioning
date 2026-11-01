@@ -317,6 +317,9 @@ aws:
   # keeping runtime controllers free of iam:* mutation privileges.
   iamBootstrap:
     enabled: false
+    # "account" (recommended: one shared set of clusterawsadm roles + official AWS-Managed
+    # Policies serving all CAPI clusters in the AWS account) or "cluster" (isolated per-cluster roles).
+    scope: "account"
     secretName: ""
     mount: env
     tuple: "k0s + calico,bgp + aws"

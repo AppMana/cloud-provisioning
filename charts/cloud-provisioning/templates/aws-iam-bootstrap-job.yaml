@@ -37,6 +37,7 @@ spec:
           args:
             - iam
             - apply
+            - --scope={{ .Values.aws.iamBootstrap.scope | default "account" }}
             - --tuple={{ .Values.aws.iamBootstrap.tuple | default "k0s + calico,bgp + aws" }}
             {{- if .Values.aws.iamBootstrap.clusterName }}
             - --cluster={{ .Values.aws.iamBootstrap.clusterName }}

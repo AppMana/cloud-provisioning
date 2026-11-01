@@ -29,14 +29,32 @@ var policyFS embed.FS
 // Managed Policy document (excluding whitespace).
 const ManagedPolicyLimitBytes = 6144
 
-// SSMManagedInstanceCoreARN is the AWS-managed policy granting Systems Manager
-// core agent permissions on EC2 workers.
-const SSMManagedInstanceCoreARN = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+// Official AWS-Managed Policy ARNs maintained by AWS across all accounts.
+const (
+	SSMManagedInstanceCoreARN                 = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+	AWSManagedVPCCNIPolicyARN                 = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+	AWSManagedWindowsVPCResourceControllerARN = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+	AWSManagedECRReadOnlyARN                  = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+	AWSManagedCloudWatchAgentARN              = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+	AWSManagedImageBuilderARN                 = "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder"
+)
+
+// Canonical upstream CAPA (clusterawsadm) account-wide role/profile names
+// shared by all clusters in an AWS account.
+const (
+	AccountSuffix              = ".cluster-api-provider-aws.sigs.k8s.io"
+	AccountControllersRoleName = "controllers.cluster-api-provider-aws.sigs.k8s.io"
+	AccountNodesRoleName       = "nodes.cluster-api-provider-aws.sigs.k8s.io"
+	AccountAMIOperatorRoleName = "ami-operator.cluster-api-provider-aws.sigs.k8s.io"
+)
 
 // PolicyID identifies a canonical policy template in policies/*.json.
 type PolicyID string
 
 const (
+	PolicyAccountControllers    PolicyID = "account-controllers"
+	PolicyAccountNodes          PolicyID = "account-nodes"
+	PolicyAccountAMIOperator    PolicyID = "account-ami-operator"
 	PolicyCAPAProvisioning      PolicyID = "capa-provisioning"
 	PolicyWorkerBootstrap       PolicyID = "worker-bootstrap"
 	PolicyVPCCNINodeIPv4        PolicyID = "vpc-cni-node-ipv4"
@@ -51,9 +69,14 @@ const (
 
 // Options configures tuple-aware IAM policy and role rendering.
 type Options struct {
+	// Scope is "account" (recommended: one shared set of CAPA roles/policies per
+	// AWS account using clusterawsadm naming + AWS Managed Policies) or "cluster"
+	// (per-cluster isolated roles/policies). Defaults to "account" when ClusterName
+	// is empty, or "cluster" when ClusterName is set and Scope is omitted.
+	Scope              string   `json:"scope,omitempty"`
 	AccountID          string   `json:"accountID"`
 	Region             string   `json:"region"`
-	ClusterName        string   `json:"clusterName"`
+	ClusterName        string   `json:"clusterName,omitempty"`
 	RolePrefix         string   `json:"rolePrefix,omitempty"`
 	OwnerTag           string   `json:"ownerTag,omitempty"`
 	OwnerValue         string   `json:"ownerValue,omitempty"`
@@ -108,11 +131,12 @@ type InstanceProfileSpec struct {
 	RoleName string `json:"roleName"`
 }
 
-// Bundle is the complete rendered IAM state for a cluster and platform tuple.
+// Bundle is the complete rendered IAM state for a cluster or AWS account.
 type Bundle struct {
+	Scope           string              `json:"scope"`
 	AccountID       string              `json:"accountID"`
 	Region          string              `json:"region"`
-	ClusterName     string              `json:"clusterName"`
+	ClusterName     string              `json:"clusterName,omitempty"`
 	Policies        []ManagedPolicy     `json:"policies"`
 	Roles           []RoleSpec          `json:"roles"`
 	InstanceProfile InstanceProfileSpec `json:"instanceProfile"`
@@ -133,14 +157,59 @@ func (o *Options) Normalize() error {
 	o.AccountID = strings.TrimSpace(o.AccountID)
 	o.Region = strings.TrimSpace(o.Region)
 	o.ClusterName = strings.TrimSpace(o.ClusterName)
+	o.Scope = strings.ToLower(strings.TrimSpace(o.Scope))
 	if o.AccountID == "" {
 		return fmt.Errorf("AWS accountID is required")
 	}
+	if o.Scope == "" {
+		if o.ClusterName == "" {
+			o.Scope = "account"
+		} else {
+			o.Scope = "cluster"
+		}
+	}
+	if o.Scope != "account" && o.Scope != "cluster" {
+		return fmt.Errorf("IAM scope must be \"account\" or \"cluster\" (got %q)", o.Scope)
+	}
 	if o.Region == "" {
-		return fmt.Errorf("AWS region is required")
+		if o.Scope == "account" {
+			o.Region = "*"
+		} else {
+			return fmt.Errorf("AWS region is required for cluster-scoped IAM bundle")
+		}
+	}
+	if o.Scope == "account" {
+		if o.SourcePrincipalARN == "" {
+			o.SourcePrincipalARN = fmt.Sprintf("arn:aws:iam::%s:root", o.AccountID)
+		}
+		if o.CAPARoleName == "" {
+			o.CAPARoleName = AccountControllersRoleName
+		}
+		if o.ControllerRoleName == "" {
+			o.ControllerRoleName = AccountControllersRoleName
+		}
+		if o.WorkerRoleName == "" {
+			o.WorkerRoleName = AccountNodesRoleName
+		}
+		if o.InstanceProfileName == "" {
+			o.InstanceProfileName = AccountNodesRoleName
+		}
+		if o.OperatorRoleName == "" {
+			o.OperatorRoleName = AccountAMIOperatorRoleName
+		}
+		if o.OwnerTag == "" {
+			o.OwnerTag = "sigs.k8s.io/cluster-api-provider-aws/managed"
+		}
+		if o.OwnerValue == "" {
+			o.OwnerValue = "true"
+		}
+		if o.VPCCNIFamily == "" {
+			o.VPCCNIFamily = "dual"
+		}
+		return nil
 	}
 	if o.ClusterName == "" {
-		return fmt.Errorf("clusterName is required")
+		return fmt.Errorf("clusterName is required for cluster-scoped IAM bundle")
 	}
 	prefix := strings.TrimSpace(o.RolePrefix)
 	if prefix == "" {
@@ -181,6 +250,9 @@ func (o *Options) Normalize() error {
 func Render(opts Options) (*Bundle, error) {
 	if err := opts.Normalize(); err != nil {
 		return nil, err
+	}
+	if opts.Scope == "account" {
+		return renderAccountBundle(opts)
 	}
 
 	amiID := "*"
@@ -418,6 +490,182 @@ func Render(opts Options) (*Bundle, error) {
 	}
 
 	return &Bundle{
+		Scope:       opts.Scope,
+		AccountID:   opts.AccountID,
+		Region:      opts.Region,
+		ClusterName: opts.ClusterName,
+		Policies:    policies,
+		Roles:       roles,
+		InstanceProfile: InstanceProfileSpec{
+			Name:     opts.InstanceProfileName,
+			ARN:      fmt.Sprintf("arn:aws:iam::%s:instance-profile/%s", opts.AccountID, opts.InstanceProfileName),
+			RoleName: opts.WorkerRoleName,
+		},
+	}, nil
+}
+
+// renderAccountBundle renders the upstream CAPA (clusterawsadm) account-wide
+// shared IAM roles and Customer Managed Policies combined with official
+// AWS-Managed Policies so a single bootstrap in the AWS account serves every
+// CAPI/CAPA cluster (Linux + Windows, VPC CNI, AMI lifecycle, Fast Launch, and
+// observability) without per-cluster role proliferation.
+func renderAccountBundle(opts Options) (*Bundle, error) {
+	vars := map[string]string{
+		"AWS_ACCOUNT_ID":        opts.AccountID,
+		"AWS_REGION":            opts.Region,
+		"CLUSTER_NAME":          "*",
+		"OWNER_TAG":             opts.OwnerTag,
+		"OWNER_VALUE":           opts.OwnerValue,
+		"NODE_ROLE_NAME":        opts.WorkerRoleName,
+		"INSTANCE_PROFILE_NAME": opts.InstanceProfileName,
+		"SOURCE_PRINCIPAL_ARN":  opts.SourcePrincipalARN,
+		"ASSET_BUCKET":          opts.AssetBucket,
+		"ASSET_PREFIX":          opts.AssetPrefix,
+	}
+
+	var policies []ManagedPolicy
+	addAccountPolicy := func(id PolicyID, policyName, desc string) (ManagedPolicy, error) {
+		mp, err := renderNamedManagedPolicy(opts, id, policyName, desc, vars, nil)
+		if err != nil {
+			return ManagedPolicy{}, err
+		}
+		policies = append(policies, mp)
+		return mp, nil
+	}
+
+	// 1. Account-wide CAPA + endpoint-controller policy (controllers.cluster-api-provider-aws.sigs.k8s.io)
+	ctrlPolicy, err := addAccountPolicy(
+		PolicyAccountControllers,
+		AccountControllersRoleName,
+		"Account-wide CAPI/CAPA and endpoint-controller EC2, VPC CNI, and Secrets Manager policy for all clusters",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Account-wide CAPI Worker Node delta policy (nodes.cluster-api-provider-aws.sigs.k8s.io)
+	nodePolicy, err := addAccountPolicy(
+		PolicyAccountNodes,
+		AccountNodesRoleName,
+		"Account-wide CAPI worker bootstrap secret consumption and IPv6 prefix assignment delta policy",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Optional S3 bootstrap artifact presigner policy
+	var artifactsPolicy *ManagedPolicy
+	if opts.AssetBucket != "" {
+		mp, err := addAccountPolicy(
+			PolicyControllerArtifacts,
+			"controller-artifacts"+AccountSuffix,
+			"Account-wide endpoint-controller S3 bootstrap artifact presigner",
+		)
+		if err != nil {
+			return nil, err
+		}
+		artifactsPolicy = &mp
+	}
+
+	// 4. Account-wide AMI Lifecycle, Windows Fast Launch, and Diagnostics policy
+	var amiOperatorPolicy *ManagedPolicy
+	if opts.IncludeAMILifecycle || opts.IncludeAMIPerformance || opts.IncludeObservability {
+		mp, err := addAccountPolicy(
+			PolicyAccountAMIOperator,
+			AccountAMIOperatorRoleName,
+			"Account-wide Linux/Windows AMI capture, Windows Fast Launch, NVIDIA GRID driver access, and EC2/SSM diagnostics",
+		)
+		if err != nil {
+			return nil, err
+		}
+		amiOperatorPolicy = &mp
+	}
+
+	capaTrustDoc, err := renderTemplateFile("capa-trust.json", vars)
+	if err != nil {
+		return nil, err
+	}
+	workerTrustDoc, err := renderTemplateFile("worker-trust.json", vars)
+	if err != nil {
+		return nil, err
+	}
+
+	// Role 1: Account-wide CAPI + Endpoint Controller Role (controllers.cluster-api-provider-aws.sigs.k8s.io)
+	ctrlRole := RoleSpec{
+		Name:                opts.CAPARoleName,
+		ARN:                 fmt.Sprintf("arn:aws:iam::%s:role/%s", opts.AccountID, opts.CAPARoleName),
+		Description:         "Shared account-wide CAPI/CAPA and cloud-provisioning controller role (clusterawsadm compatible)",
+		AssumeRolePolicyDoc: capaTrustDoc,
+		ManagedPolicyNames:  []string{ctrlPolicy.Name},
+		ManagedPolicyARNs:   []string{ctrlPolicy.ARN},
+	}
+	if opts.IncludeWindows || opts.IncludeVPCCNI {
+		// Official AWS-Managed Policy for Windows VPC CNI IPAM controller
+		ctrlRole.ManagedPolicyARNs = append(ctrlRole.ManagedPolicyARNs, AWSManagedWindowsVPCResourceControllerARN)
+	}
+	if artifactsPolicy != nil {
+		ctrlRole.ManagedPolicyNames = append(ctrlRole.ManagedPolicyNames, artifactsPolicy.Name)
+		ctrlRole.ManagedPolicyARNs = append(ctrlRole.ManagedPolicyARNs, artifactsPolicy.ARN)
+	}
+	roles := []RoleSpec{ctrlRole}
+
+	// If a separate ControllerRoleName was explicitly overridden, render it too.
+	if opts.ControllerRoleName != "" && opts.ControllerRoleName != opts.CAPARoleName {
+		sepCtrl := ctrlRole
+		sepCtrl.Name = opts.ControllerRoleName
+		sepCtrl.ARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", opts.AccountID, opts.ControllerRoleName)
+		roles = append(roles, sepCtrl)
+	}
+
+	// Role 2: Account-wide CAPI Worker Node Role + Instance Profile (nodes.cluster-api-provider-aws.sigs.k8s.io)
+	// Combines the tiny CAPI secret/IPv6 delta policy with official AWS-Managed Policies:
+	//   - AmazonEKS_CNI_Policy (IPv4 ENI & IPAM)
+	//   - AmazonEC2ContainerRegistryReadOnly (ECR image pulls)
+	//   - AmazonSSMManagedInstanceCore (Fleet Manager / Session Manager / RunCommand)
+	//   - CloudWatchAgentServerPolicy (CloudWatch logs & metrics)
+	workerRole := RoleSpec{
+		Name:                opts.WorkerRoleName,
+		ARN:                 fmt.Sprintf("arn:aws:iam::%s:role/%s", opts.AccountID, opts.WorkerRoleName),
+		Description:         "Shared account-wide CAPI Linux and Windows worker node role (clusterawsadm compatible)",
+		AssumeRolePolicyDoc: workerTrustDoc,
+		ManagedPolicyNames:  []string{nodePolicy.Name},
+		ManagedPolicyARNs: []string{
+			nodePolicy.ARN,
+			AWSManagedECRReadOnlyARN,
+		},
+	}
+	if opts.IncludeVPCCNI {
+		workerRole.ManagedPolicyARNs = append(workerRole.ManagedPolicyARNs, AWSManagedVPCCNIPolicyARN)
+	}
+	if opts.IncludeObservability {
+		workerRole.ManagedPolicyARNs = append(workerRole.ManagedPolicyARNs,
+			SSMManagedInstanceCoreARN,
+			AWSManagedCloudWatchAgentARN,
+		)
+	}
+	roles = append(roles, workerRole)
+
+	// Role 3: Account-wide AMI Lifecycle, Fast Launch & Diagnostics Role (ami-operator.cluster-api-provider-aws.sigs.k8s.io)
+	// Combines our Fast Launch / GRID / console screenshot delta policy with AWS's official
+	// EC2InstanceProfileForImageBuilder and AmazonSSMManagedInstanceCore managed policies.
+	if amiOperatorPolicy != nil {
+		opRole := RoleSpec{
+			Name:                opts.OperatorRoleName,
+			ARN:                 fmt.Sprintf("arn:aws:iam::%s:role/%s", opts.AccountID, opts.OperatorRoleName),
+			Description:         "Shared account-wide AMI builder, Windows Fast Launch, and diagnostics role",
+			AssumeRolePolicyDoc: capaTrustDoc,
+			ManagedPolicyNames:  []string{amiOperatorPolicy.Name},
+			ManagedPolicyARNs: []string{
+				amiOperatorPolicy.ARN,
+				AWSManagedImageBuilderARN,
+				SSMManagedInstanceCoreARN,
+			},
+		}
+		roles = append(roles, opRole)
+	}
+
+	return &Bundle{
+		Scope:       opts.Scope,
 		AccountID:   opts.AccountID,
 		Region:      opts.Region,
 		ClusterName: opts.ClusterName,
@@ -432,6 +680,11 @@ func Render(opts Options) (*Bundle, error) {
 }
 
 func renderManagedPolicy(opts Options, id PolicyID, description string, vars map[string]string, mutate func(map[string]any)) (ManagedPolicy, error) {
+	name := fmt.Sprintf("%s-%s", opts.RolePrefix, id)
+	return renderNamedManagedPolicy(opts, id, name, description, vars, mutate)
+}
+
+func renderNamedManagedPolicy(opts Options, id PolicyID, name, description string, vars map[string]string, mutate func(map[string]any)) (ManagedPolicy, error) {
 	rawDoc, err := renderTemplateFile(string(id)+".json", vars)
 	if err != nil {
 		return ManagedPolicy{}, err
@@ -455,7 +708,6 @@ func renderManagedPolicy(opts Options, id PolicyID, description string, vars map
 		return ManagedPolicy{}, fmt.Errorf("policy %s compact size %d exceeds AWS 6144-byte managed policy limit", id, compact.Len())
 	}
 	sum := sha256.Sum256(formatted)
-	name := fmt.Sprintf("%s-%s", opts.RolePrefix, id)
 	return ManagedPolicy{
 		ID:          id,
 		Name:        name,

@@ -1,0 +1,91 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InspectAMIsSnapshotsVolumesAndFastLaunch",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeImages",
+        "ec2:DescribeImageAttribute",
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeSnapshotAttribute",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVolumesModifications",
+        "ec2:DescribeFastLaunchImages",
+        "ec2:DescribeLaunchTemplates",
+        "ec2:DescribeLaunchTemplateVersions",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:GetConsoleOutput",
+        "ec2:GetConsoleScreenshot",
+        "ssm:DescribeInstanceInformation",
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CreateAndRegisterAMIsAndSnapshots",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateImage",
+        "ec2:RegisterImage",
+        "ec2:CopyImage",
+        "ec2:CreateSnapshot",
+        "ec2:CreateLaunchTemplate",
+        "ec2:CreateLaunchTemplateVersion",
+        "ec2:CreateTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ManageAMIsFastLaunchAndBuilderVolumes",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DeregisterImage",
+        "ec2:ModifyImageAttribute",
+        "ec2:DeleteSnapshot",
+        "ec2:ModifySnapshotAttribute",
+        "ec2:ModifyVolume",
+        "ec2:EnableFastLaunch",
+        "ec2:DisableFastLaunch",
+        "ec2:DeleteLaunchTemplate",
+        "ec2:DeleteLaunchTemplateVersions",
+        "ebs:ListSnapshotBlocks",
+        "ebs:ListChangedBlocks",
+        "ebs:GetSnapshotBlock"
+      ],
+      "Resource": [
+        "arn:aws:ec2:*::image/*",
+        "arn:aws:ec2:*::snapshot/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:volume/*",
+        "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:launch-template/*"
+      ]
+    },
+    {
+      "Sid": "CreateFastLaunchServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateServiceLinkedRole"
+      ],
+      "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/aws-service-role/fastlaunch.ec2.amazonaws.com/*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "fastlaunch.ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "FetchWindowsNVIDIAGRIDDrivers",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::ec2-windows-nvidia-drivers",
+        "arn:aws:s3:::ec2-windows-nvidia-drivers/*"
+      ]
+    }
+  ]
+}

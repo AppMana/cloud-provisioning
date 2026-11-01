@@ -1,0 +1,33 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ConsumeCAPIBootstrapSecrets",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DeleteSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:*:${AWS_ACCOUNT_ID}:secret:aws.cluster.x-k8s.io/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/sigs.k8s.io/cluster-api-provider-aws/managed": "true"
+        }
+      }
+    },
+    {
+      "Sid": "AssignIPv6PrefixesOnCAPIOwnedENIs",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AssignIpv6Addresses",
+        "ec2:UnassignIpv6Addresses"
+      ],
+      "Resource": "arn:aws:ec2:*:${AWS_ACCOUNT_ID}:network-interface/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/sigs.k8s.io/cluster-api-provider-aws/managed": "true"
+        }
+      }
+    }
+  ]
+}

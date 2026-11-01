@@ -57,6 +57,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/nodegroup"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
+	awsiam "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws/iam"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	appsv1 "k8s.io/api/apps/v1"
@@ -2428,6 +2429,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "check" {
 		os.Exit(runPlatformTupleCheck(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "iam" {
+		os.Exit(runAWSIAMCommand(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	var (
 		machineSelector  string
 		secretNamespace  string
@@ -2563,6 +2567,10 @@ func main() {
 	windowsIPAMPullSecrets := flag.String("aws-windows-ipam-pull-secrets", "", "comma-separated kube-system Secrets for pulling the Windows IPAM image")
 	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
+	awsIAMBootstrap := flag.Bool("aws-iam-bootstrap", false, "reconcile AWS IAM policies, roles, and instance profile at startup using current AWS credentials")
+	awsIAMTuple := flag.String("aws-iam-tuple", "k0s + calico,bgp + aws", "platform tuple expression used when --aws-iam-bootstrap is enabled")
+	awsIAMCluster := flag.String("aws-iam-cluster", "", "optional CAPI cluster name override when --aws-iam-bootstrap is enabled")
+	awsIAMRegion := flag.String("aws-iam-region", "", "optional AWS region override when --aws-iam-bootstrap is enabled")
 	flag.Parse()
 	receivePolicy, policyErr := parseReceivePreparationPolicy(*receivePolicyJSON, wireGuardListenPort)
 	if policyErr != nil {
@@ -2730,6 +2738,33 @@ func main() {
 
 	// AWS calls use the SDK's standard credentials.
 	awsSDK := &platformaws.SDK{}
+	if *awsIAMBootstrap {
+		iamCtx, iamCancel := context.WithTimeout(context.Background(), 60*time.Second)
+		iamClient, acct, err := awsiam.NewClientFromDefaultConfig(iamCtx, *awsIAMRegion)
+		if err != nil {
+			iamCancel()
+			fmt.Fprintf(os.Stderr, "--aws-iam-bootstrap failed to initialize IAM client: %v\n", err)
+			os.Exit(1)
+		}
+		report, _, err := tuple.ApplyIAMBundle(iamCtx, iamClient, mgr.GetClient(), mgr.GetAPIReader(), tuple.IAMConfig{
+			Tuple:                 *awsIAMTuple,
+			AccountID:             acct,
+			Region:                *awsIAMRegion,
+			ClusterName:           *awsIAMCluster,
+			AssetBucket:           *artifactRegion,
+			VPCCNIFamily:          *vpcCNIFamily,
+			IncludeAMILifecycle:   true,
+			IncludeAMIPerformance: true,
+			IncludeObservability:  true,
+			AllowedNamespace:      secretNamespace,
+		}, false)
+		iamCancel()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "--aws-iam-bootstrap failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "aws-iam-bootstrap: reconciled %d changes for cluster %s (%s)\n", len(report.Changes), report.ClusterName, report.AccountID)
+	}
 	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName, EC2: awsSDK.API, WindowsIPAM: *vpcCNI && *windowsIPAMImage != ""}
 	dockerProvider := joindocker.Provider{}
 	// Adopts a container someone else owns, which is how a lab topology
@@ -3205,4 +3240,114 @@ func runPlatformTupleCheck(args []string, out, diagnostics io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func runAWSIAMCommand(args []string, out, diagnostics io.Writer) int {
+	verb := "render"
+	if len(args) > 0 && (args[0] == "render" || args[0] == "apply") {
+		verb = args[0]
+		args = args[1:]
+	}
+	fs := flag.NewFlagSet("endpoint-controller iam "+verb, flag.ContinueOnError)
+	fs.SetOutput(diagnostics)
+	var cfg tuple.IAMConfig
+	fs.StringVar(&cfg.Tuple, "tuple", "k0s + calico,bgp + aws", "platform tuple expression")
+	fs.StringVar(&cfg.AccountID, "account-id", "", "AWS 12-digit account ID (auto-detected via STS when omitted)")
+	fs.StringVar(&cfg.Region, "region", "", "AWS region (auto-discovered from AWSCluster when --kubeconfig is set)")
+	fs.StringVar(&cfg.ClusterName, "cluster", "", "CAPI cluster name (auto-discovered from AWSCluster when --kubeconfig is set)")
+	fs.StringVar(&cfg.RolePrefix, "role-prefix", "", "optional IAM role/policy name prefix")
+	fs.StringVar(&cfg.OwnerTag, "owner-tag", "", "optional ownership tag key")
+	fs.StringVar(&cfg.OwnerValue, "owner-value", "", "optional ownership tag value")
+	fs.StringVar(&cfg.SourcePrincipalARN, "source-principal-arn", "", "optional IAM principal ARN allowed to AssumeRole")
+	fs.Func("ami", "approved AMI ID (repeatable)", func(v string) error {
+		cfg.AMIs = append(cfg.AMIs, v)
+		return nil
+	})
+	fs.Func("subnet", "approved Subnet ID (repeatable)", func(v string) error {
+		cfg.Subnets = append(cfg.Subnets, v)
+		return nil
+	})
+	fs.Func("security-group", "approved Security Group ID (repeatable)", func(v string) error {
+		cfg.SecurityGroups = append(cfg.SecurityGroups, v)
+		return nil
+	})
+	fs.StringVar(&cfg.AssetBucket, "asset-bucket", "", "optional S3 asset bucket")
+	fs.StringVar(&cfg.AssetPrefix, "asset-prefix", "", "optional S3 asset prefix")
+	fs.StringVar(&cfg.VPCCNIFamily, "vpc-cni-family", "dual", "VPC CNI family: ipv4, ipv6, or dual")
+	fs.BoolVar(&cfg.IncludeAMILifecycle, "include-ami-lifecycle", true, "include AMI lifecycle policy")
+	fs.BoolVar(&cfg.IncludeAMIPerformance, "include-ami-performance", true, "include Windows EC2 Fast Launch and EBS snapshot warming policy")
+	fs.BoolVar(&cfg.IncludeObservability, "include-observability", true, "include worker and operator observability policies")
+	fs.StringVar(&cfg.ClusterRoleIdentity, "cluster-role-identity", "", "optional AWSClusterRoleIdentity name to reconcile in Kubernetes")
+	fs.StringVar(&cfg.SourceIdentityName, "source-identity", "", "optional AWSClusterStaticIdentity name")
+	fs.StringVar(&cfg.AllowedNamespace, "allowed-namespace", "cloud-provisioning", "namespace allowed for AWSClusterRoleIdentity")
+	kubeconfig := fs.String("kubeconfig", "", "optional kubeconfig path")
+	kubecontext := fs.String("context", "", "optional kubeconfig context override")
+	dryRun := fs.Bool("dry-run", false, "preview IAM changes without mutating AWS or Kubernetes")
+	timeout := fs.Duration("timeout", 60*time.Second, "operation timeout")
+
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+
+	var cl client.Client
+	if *kubeconfig != "" || os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		loading := clientcmd.NewDefaultClientConfigLoadingRules()
+		if *kubeconfig != "" {
+			loading = &clientcmd.ClientConfigLoadingRules{ExplicitPath: *kubeconfig}
+		}
+		restCfg, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loading, &clientcmd.ConfigOverrides{CurrentContext: *kubecontext}).ClientConfig()
+		if err == nil {
+			restCfg.Timeout = *timeout
+			sc := runtime.NewScheme()
+			_ = scheme.AddToScheme(sc)
+			for _, kind := range []string{"AWSCluster", "AWSMachineTemplate", "AWSClusterRoleIdentity"} {
+				gvk := schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: kind}
+				sc.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+				sc.AddKnownTypeWithName(gvk.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
+			}
+			cl, _ = client.New(restCfg, client.Options{Scheme: sc})
+		}
+	}
+
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+
+	switch verb {
+	case "render":
+		if cfg.AccountID == "" {
+			if _, acct, err := awsiam.NewClientFromDefaultConfig(ctx, cfg.Region); err == nil && acct != "" {
+				cfg.AccountID = acct
+			}
+		}
+		bundle, err := tuple.RenderIAMBundle(ctx, cl, cfg)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		_ = enc.Encode(bundle)
+		return 0
+
+	case "apply":
+		iamClient, acct, err := awsiam.NewClientFromDefaultConfig(ctx, cfg.Region)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		if cfg.AccountID == "" {
+			cfg.AccountID = acct
+		}
+		report, _, err := tuple.ApplyIAMBundle(ctx, iamClient, cl, cl, cfg, *dryRun)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		_ = enc.Encode(report)
+		return 0
+
+	default:
+		fmt.Fprintf(diagnostics, "unknown iam verb %q (expected render or apply)\n", verb)
+		return 2
+	}
 }

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	awsiam "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws/iam"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -66,7 +67,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	fs.BoolVar(&winOpts.ExcludeCloudWorkers, "exclude-cloud-workers", false, "exclude cloud-worker role from calico-node-windows")
 	fs.BoolVar(&winOpts.Offline, "offline", false, "set ImagePullPolicy=Never")
 
-	mode := fs.String("mode", "check", "check (evaluate platform tuple), fix (reconcile live Calico MTU and Windows BGP settings), render (Windows BGP manifest), k0s-network (k0s spec fragment), or validate-k0s-config")
+	mode := fs.String("mode", "check", "check, fix, iam-render, iam-apply, render, k0s-network, or validate-k0s-config")
 	tupleExpr := fs.String("tuple", "k0s + calico,bgp + aws", "platform tuple expression (e.g. \"k0s + calico,bgp + aws\")")
 	k0sConfigPath := fs.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
 	valuesPath := fs.String("values", "", "optional Helm values.yaml path to inspect for cloud-provisioning configuration")
@@ -78,7 +79,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	format := fs.String("format", "json", "output format for check mode: json or text")
 	kubeconfig := fs.String("kubeconfig", "", "optional kubeconfig path for live cluster checks or reconciliation")
 	kubecontext := fs.String("context", "", "optional kubeconfig context override")
-	dryRun := fs.Bool("dry-run", false, "report live Calico/Windows BGP changes without persisting them (--mode=fix)")
+	dryRun := fs.Bool("dry-run", false, "report live Calico/Windows BGP/IAM changes without persisting them")
 	tunnelMTU := fs.Int("tunnel-mtu", 1420, "WireGuard tunnel MTU budget")
 	tunnelIPv4 := fs.String("tunnel-ipv4", "10.100.0.0/24", "WireGuard IPv4 tunnel range")
 	tunnelIPv6 := fs.String("tunnel-ipv6", "fd00:10:100::/96", "WireGuard IPv6 tunnel range")
@@ -90,9 +91,39 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	ipv6ServiceCIDR := fs.String("ipv6-service-cidr", "", "optional IPv6 service CIDR for k0s-network mode")
 	timeout := fs.Duration("timeout", 30*time.Second, "API request timeout")
 
+	var iamCfg tuple.IAMConfig
+	fs.StringVar(&iamCfg.AccountID, "aws-account-id", "", "AWS 12-digit account ID (auto-detected via STS in iam-apply when omitted)")
+	fs.StringVar(&iamCfg.Region, "aws-region", "", "AWS region for IAM policy scoping (auto-discovered from AWSCluster when --kubeconfig is set)")
+	fs.StringVar(&iamCfg.ClusterName, "aws-cluster", "", "CAPI cluster name for IAM tag scoping (auto-discovered from AWSCluster when --kubeconfig is set)")
+	fs.StringVar(&iamCfg.RolePrefix, "aws-role-prefix", "", "optional IAM role/policy name prefix (defaults to --aws-cluster)")
+	fs.StringVar(&iamCfg.OwnerTag, "aws-owner-tag", "", "optional resource ownership tag key (defaults to CAPA cluster tag)")
+	fs.StringVar(&iamCfg.OwnerValue, "aws-owner-value", "", "optional resource ownership tag value (defaults to 'owned')")
+	fs.StringVar(&iamCfg.SourcePrincipalARN, "aws-source-principal-arn", "", "optional IAM principal ARN allowed to AssumeRole into CAPA/controller/operator roles")
+	fs.Func("aws-ami", "approved AMI ID for CAPA RunInstances (repeatable; defaults to cluster-tagged AMIs)", func(v string) error {
+		iamCfg.AMIs = append(iamCfg.AMIs, v)
+		return nil
+	})
+	fs.Func("aws-subnet", "approved Subnet ID for CAPA RunInstances (repeatable)", func(v string) error {
+		iamCfg.Subnets = append(iamCfg.Subnets, v)
+		return nil
+	})
+	fs.Func("aws-security-group", "approved Security Group ID for CAPA RunInstances (repeatable)", func(v string) error {
+		iamCfg.SecurityGroups = append(iamCfg.SecurityGroups, v)
+		return nil
+	})
+	fs.StringVar(&iamCfg.AssetBucket, "aws-asset-bucket", "", "optional private S3 bucket for bootstrap binary presigning")
+	fs.StringVar(&iamCfg.AssetPrefix, "aws-asset-prefix", "", "optional S3 key prefix in --aws-asset-bucket")
+	fs.StringVar(&iamCfg.VPCCNIFamily, "aws-vpc-cni-family", "dual", "AWS VPC CNI address family: ipv4, ipv6, or dual")
+	fs.BoolVar(&iamCfg.IncludeAMILifecycle, "aws-include-ami-lifecycle", true, "include AMI capture, registration, volume sizing, and NVIDIA GRID policies")
+	fs.BoolVar(&iamCfg.IncludeAMIPerformance, "aws-include-ami-performance", true, "include Windows EC2 Fast Launch and EBS snapshot warming policies")
+	fs.BoolVar(&iamCfg.IncludeObservability, "aws-include-observability", true, "include worker CloudWatch/SSM telemetry and operator console/SSM diagnostic policies")
+	fs.StringVar(&iamCfg.ClusterRoleIdentity, "aws-cluster-role-identity", "", "optional AWSClusterRoleIdentity name to create/update in Kubernetes during iam-apply")
+	fs.StringVar(&iamCfg.SourceIdentityName, "aws-source-identity", "", "optional AWSClusterStaticIdentity name referenced by --aws-cluster-role-identity")
+	fs.StringVar(&iamCfg.AllowedNamespace, "aws-allowed-namespace", "cloud-provisioning", "namespace allowed to use --aws-cluster-role-identity")
+
 	isVerb := func(v string) bool {
 		switch v {
-		case "check", "fix", "render", "k0s-network", "validate-k0s-config":
+		case "check", "fix", "iam-render", "iam-apply", "render", "k0s-network", "validate-k0s-config":
 			return true
 		default:
 			return false
@@ -162,6 +193,9 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 			{Group: "helm.toolkit.fluxcd.io", Version: "v2", Kind: "HelmRelease"},
 			{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Kind: "Kustomization"},
 			{Group: "argoproj.io", Version: "v1alpha1", Kind: "Application"},
+			{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSCluster"},
+			{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachineTemplate"},
+			{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterRoleIdentity"},
 		} {
 			sc.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
 			sc.AddKnownTypeWithName(gvk.GroupVersion().WithKind(gvk.Kind+"List"), &unstructured.UnstructuredList{})
@@ -246,6 +280,58 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 				report.ManifestFilesPatched = true
 				report.Changes = append(report.Changes, fileChanges...)
 			}
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(report)
+
+	case "iam-render":
+		iamCfg.Tuple = *tupleExpr
+		var reader client.Reader
+		if *kubeconfig != "" {
+			cl, _, err := newKubeClient()
+			if err != nil {
+				return err
+			}
+			reader = cl
+		}
+		ctx, cancel := context.WithTimeout(ctx, *timeout)
+		defer cancel()
+		if iamCfg.AccountID == "" {
+			if _, acct, err := awsiam.NewClientFromDefaultConfig(ctx, iamCfg.Region); err == nil && acct != "" {
+				iamCfg.AccountID = acct
+			}
+		}
+		bundle, err := tuple.RenderIAMBundle(ctx, reader, iamCfg)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(bundle)
+
+	case "iam-apply":
+		iamCfg.Tuple = *tupleExpr
+		var cl client.Client
+		if *kubeconfig != "" {
+			var err error
+			cl, _, err = newKubeClient()
+			if err != nil {
+				return err
+			}
+		}
+		ctx, cancel := context.WithTimeout(ctx, *timeout)
+		defer cancel()
+		iamClient, acct, err := awsiam.NewClientFromDefaultConfig(ctx, iamCfg.Region)
+		if err != nil {
+			return err
+		}
+		if iamCfg.AccountID == "" {
+			iamCfg.AccountID = acct
+		}
+		report, _, err := tuple.ApplyIAMBundle(ctx, iamClient, cl, cl, iamCfg, *dryRun)
+		if err != nil {
+			return err
 		}
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")

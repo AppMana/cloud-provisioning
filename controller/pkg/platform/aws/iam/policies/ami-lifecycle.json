@@ -1,0 +1,113 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadImagesAndSnapshots",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeImages",
+        "ec2:DescribeImageAttribute",
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeSnapshotAttribute",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVolumesModifications",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceTypes",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "CaptureAndRegisterAMIs",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateImage",
+        "ec2:RegisterImage",
+        "ec2:CopyImage",
+        "ec2:CreateSnapshot"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "TagNewAMIsAndSnapshots",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}::image/*",
+        "arn:aws:ec2:${AWS_REGION}::snapshot/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "aws:RequestTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOwnedAMIsAndSnapshots",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DeregisterImage",
+        "ec2:ModifyImageAttribute",
+        "ec2:DeleteSnapshot",
+        "ec2:ModifySnapshotAttribute",
+        "ec2:ModifyVolume",
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}::image/*",
+        "arn:aws:ec2:${AWS_REGION}::snapshot/*",
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:volume/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOwnedImageBuilders",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:StopInstances",
+        "ec2:StartInstances",
+        "ec2:RebootInstances",
+        "ec2:TerminateInstances"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "FetchWindowsNVIDIAGRIDDrivers",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::ec2-windows-nvidia-drivers",
+        "arn:aws:s3:::ec2-windows-nvidia-drivers/*"
+      ]
+    }
+  ]
+}

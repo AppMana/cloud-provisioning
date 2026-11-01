@@ -309,6 +309,26 @@ aws:
   credentials:
     secretName: ""
     mount: env
+  # Optional install-time IAM bootstrap Job (pre-install,pre-upgrade hook).
+  # Uses developer/setup AWS credentials from secretName (or aws.credentials.secretName
+  # when secretName is empty) to idempotently create/update Customer Managed Policies,
+  # IAM Roles (CAPA, endpoint-controller, worker-node, ami-operator), the EC2 Instance
+  # Profile, and optional AWSClusterRoleIdentity once at installation/upgrade time,
+  # keeping runtime controllers free of iam:* mutation privileges.
+  iamBootstrap:
+    enabled: false
+    secretName: ""
+    mount: env
+    tuple: "k0s + calico,bgp + aws"
+    clusterName: ""
+    region: ""
+    rolePrefix: ""
+    vpcCNIFamily: "dual"
+    includeAMILifecycle: true
+    includeAMIPerformance: true
+    includeObservability: true
+    clusterRoleIdentity: ""
+    sourceIdentityName: ""
 
 platforms:
   aws:

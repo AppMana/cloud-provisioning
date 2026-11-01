@@ -1,0 +1,94 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InspectFastLaunchAndTemplates",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeFastLaunchImages",
+        "ec2:DescribeLaunchTemplates",
+        "ec2:DescribeLaunchTemplateVersions"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "ConfigureWindowsFastLaunch",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:EnableFastLaunch",
+        "ec2:DisableFastLaunch"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}::image/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedFastLaunchTemplates",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateLaunchTemplate",
+        "ec2:CreateTags"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:launch-template/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "aws:RequestTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOwnedFastLaunchTemplates",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateLaunchTemplateVersion",
+        "ec2:DeleteLaunchTemplate",
+        "ec2:DeleteLaunchTemplateVersions"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:launch-template/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "WarmAndInspectEBSSnapshots",
+      "Effect": "Allow",
+      "Action": [
+        "ebs:ListSnapshotBlocks",
+        "ebs:ListChangedBlocks",
+        "ebs:GetSnapshotBlock"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}::snapshot/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        }
+      }
+    },
+    {
+      "Sid": "CreateFastLaunchServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateServiceLinkedRole"
+      ],
+      "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/aws-service-role/fastlaunch.ec2.amazonaws.com/*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "fastlaunch.ec2.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

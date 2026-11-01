@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AssumeOnlyCAPAsRole",
+      "Effect": "Allow",
+      "Action": [
+        "sts:AssumeRole"
+      ],
+      "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CAPA_ROLE_NAME}"
+    }
+  ]
+}

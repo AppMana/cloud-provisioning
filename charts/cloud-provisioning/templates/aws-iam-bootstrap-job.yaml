@@ -1,0 +1,82 @@
+{{- if and .Values.aws .Values.aws.iamBootstrap .Values.aws.iamBootstrap.enabled }}
+{{- $credSecret := .Values.aws.iamBootstrap.secretName | default .Values.aws.credentials.secretName -}}
+{{- $credMount := .Values.aws.iamBootstrap.mount | default .Values.aws.credentials.mount -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-iam-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "cloud-provisioning.labels" . | nindent 8 }}
+        app.kubernetes.io/component: iam-bootstrap
+    spec:
+      serviceAccountName: {{ include "cloud-provisioning.controllerName" . }}
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: iam-bootstrap
+          image: {{ include "cloud-provisioning.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - iam
+            - apply
+            - --tuple={{ .Values.aws.iamBootstrap.tuple | default "k0s + calico,bgp + aws" }}
+            {{- if .Values.aws.iamBootstrap.clusterName }}
+            - --cluster={{ .Values.aws.iamBootstrap.clusterName }}
+            {{- end }}
+            {{- if .Values.aws.iamBootstrap.region }}
+            - --region={{ .Values.aws.iamBootstrap.region }}
+            {{- end }}
+            {{- if .Values.aws.iamBootstrap.rolePrefix }}
+            - --role-prefix={{ .Values.aws.iamBootstrap.rolePrefix }}
+            {{- end }}
+            - --vpc-cni-family={{ .Values.aws.iamBootstrap.vpcCNIFamily | default "dual" }}
+            - --include-ami-lifecycle={{ .Values.aws.iamBootstrap.includeAMILifecycle }}
+            - --include-ami-performance={{ .Values.aws.iamBootstrap.includeAMIPerformance }}
+            - --include-observability={{ .Values.aws.iamBootstrap.includeObservability }}
+            {{- if .Values.aws.iamBootstrap.clusterRoleIdentity }}
+            - --cluster-role-identity={{ .Values.aws.iamBootstrap.clusterRoleIdentity }}
+            {{- end }}
+            {{- if .Values.aws.iamBootstrap.sourceIdentityName }}
+            - --source-identity={{ .Values.aws.iamBootstrap.sourceIdentityName }}
+            {{- end }}
+            - --allowed-namespace={{ .Release.Namespace }}
+          {{- if and $credSecret (eq $credMount "env") }}
+          envFrom:
+            - secretRef:
+                name: {{ $credSecret }}
+          {{- else if and $credSecret (eq $credMount "files") }}
+          env:
+            - name: AWS_CONFIG_FILE
+              value: /var/run/secrets/aws/config
+            - name: AWS_SHARED_CREDENTIALS_FILE
+              value: /var/run/secrets/aws/credentials
+          volumeMounts:
+            - name: aws-credentials
+              mountPath: /var/run/secrets/aws
+              readOnly: true
+          {{- end }}
+      {{- if and $credSecret (eq $credMount "files") }}
+      volumes:
+        - name: aws-credentials
+          secret:
+            secretName: {{ $credSecret }}
+      {{- end }}
+{{- end }}

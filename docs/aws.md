@@ -224,8 +224,9 @@ names. Harness-only policies (harness, runner, publisher) use the run's
 
 | Role | Policies | Purpose |
 | --- | --- | --- |
-| CAPA controller | [capa.json](iam/capa.json), [capa-trust.json](iam/capa-trust.json) | Discover EC2 resources; launch the approved AMI in the approved subnet/security group; manage tagged instances and bootstrap Secrets Manager entries; pass only the worker role |
-| EC2 worker | [worker-bootstrap.json](iam/worker-bootstrap.json), [worker-trust.json](iam/worker-trust.json) | Read and delete this run's CAPA bootstrap secrets |
+| CAPA controller | [capa-provisioning.json](iam/capa-provisioning.json) (or single-AMI [capa.json](iam/capa.json)), [capa-trust.json](iam/capa-trust.json) | Discover EC2 resources; launch approved or cluster-tagged Linux & Windows AMIs in the approved subnets/security groups; manage tagged instances and bootstrap Secrets Manager entries; pass only the worker role |
+| EC2 worker | [worker-bootstrap.json](iam/worker-bootstrap.json), [worker-observability.json](iam/worker-observability.json), [worker-trust.json](iam/worker-trust.json) | Read and delete CAPA bootstrap secrets (Linux `cloud-init` & Windows `EC2Launch v2`); publish CloudWatch logs/metrics and inspect own tags |
+| AMI & performance operator | [ami-lifecycle.json](iam/ami-lifecycle.json), [ami-performance.json](iam/ami-performance.json), [operator-observability.json](iam/operator-observability.json) | Capture/register/deregister Linux & Windows AMIs and EBS snapshots, resize builder volumes, fetch NVIDIA GRID drivers, configure Windows EC2 Fast Launch pre-provisioned snapshots, and read EC2 serial console/screenshots & SSM diagnostics |
 | Binary publisher | [assets.json](iam/assets.json) | Create a private test bucket and publish expiring downloads; keep this role separate from CAPA |
 | Windows image publisher | [publisher.json](iam/publisher.json) | Manage the run’s private Windows component ECR repositories and issue repository-scoped pull sessions; separate from CAPA and workers |
 | Harness operator | [harness.json](iam/harness.json) | Inspect instances, issue EC2 power operations, run SSM commands on tagged instances, and stage private command input |
@@ -235,7 +236,49 @@ names. Harness-only policies (harness, runner, publisher) use the run's
 | Gateway UDP ingress adapter (experimental) | [gateway-ingress.json](iam/gateway-ingress.json) | Observe groups/rules, add tagged rules and revoke ingress in one named, run-tagged security group |
 | Controller (`aws.credentials`) | [controller.json](iam/controller.json) | Observe VPC CNI allocations (interfaces and subnets) and check that VPC CNI nodes' security groups admit each other |
 | Controller, with `s3://` artifact sources | [controller-artifacts.json](iam/controller-artifacts.json) | Read the artifact objects whose download URLs the controller signs when it renders a bootstrap |
-| EC2 worker running the AWS VPC CNI | [vpc-cni-node-ipv4.json](iam/vpc-cni-node-ipv4.json) or [vpc-cni-node-ipv6.json](iam/vpc-cni-node-ipv6.json) | aws-node's IPAM: assign and release pod addresses, and record the instance, only on interfaces CAPA tagged `sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}: owned` |
+| EC2 worker running the AWS VPC CNI | [vpc-cni-node-ipv4.json](iam/vpc-cni-node-ipv4.json) or [vpc-cni-node-ipv6.json](iam/vpc-cni-node-ipv6.json) | aws-node's IPAM (and Windows VPC resource controller IPAM): assign and release pod addresses, and record the instance, only on interfaces CAPA tagged `sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}: owned` |
+
+### Install-time IAM bootstrap (CLI, Helm hook, or controller startup)
+
+In line with AWS and Cluster API (`clusterawsadm`) best practices, runtime
+in-cluster controllers should **not** hold permanent `iam:CreateRole`,
+`iam:PutRolePolicy`, or `iam:AttachRolePolicy` permissions in steady state.
+Instead, use the installing developer's AWS credentials once at installation or
+upgrade time to render and apply the tuple's Customer Managed Policies, IAM
+Roles (`<cluster>-capa-controller`, `<cluster>-endpoint-controller`,
+`<cluster>-worker-node`, `<cluster>-ami-operator`), EC2 Instance Profile, and
+optional Kubernetes `AWSClusterRoleIdentity`:
+
+```sh
+# 1. Preview the rendered IAM bundle for a platform tuple
+go run ./controller/cmd/platform-tuple iam-render \
+  --tuple="k0s + calico,bgp,windows + aws,aws-vpc" \
+  --aws-cluster=my-cluster \
+  --aws-region=us-west-2 \
+  --kubeconfig="$KUBECONFIG"
+
+# 2. Create/update all Customer Managed Policies, Roles, Instance Profile,
+#    and Kubernetes AWSClusterRoleIdentity using the developer's AWS credentials:
+go run ./controller/cmd/platform-tuple iam-apply \
+  --tuple="k0s + calico,bgp,windows + aws,aws-vpc" \
+  --aws-cluster=my-cluster \
+  --aws-region=us-west-2 \
+  --aws-cluster-role-identity=aws-role-identity \
+  --kubeconfig="$KUBECONFIG"
+
+# Or via the endpoint-controller binary directly:
+endpoint-controller iam apply \
+  --tuple="k0s + calico,bgp,windows + aws,aws-vpc" \
+  --cluster=my-cluster \
+  --region=us-west-2 \
+  --kubeconfig="$KUBECONFIG"
+```
+
+Alternatively, enable the chart's one-shot `pre-install,pre-upgrade` Helm hook
+Job (`aws.iamBootstrap.enabled=true` in `values.yaml`, or `--aws-iam-bootstrap`
+on `endpoint-controller`) with an install-time bootstrap credential Secret. The
+reconciler automatically prunes the oldest non-default policy version when a
+Customer Managed Policy reaches AWS's 5-version limit.
 
 VPC CNI nodes' security groups must admit each other: pods on different nodes
 talk directly from addresses on each node's interface. Give one of the groups an

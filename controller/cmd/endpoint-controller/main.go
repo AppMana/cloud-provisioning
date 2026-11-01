@@ -3246,7 +3246,7 @@ func runPlatformTupleCheck(args []string, out, diagnostics io.Writer) int {
 
 func runAWSIAMCommand(args []string, out, diagnostics io.Writer) int {
 	verb := "render"
-	if len(args) > 0 && (args[0] == "render" || args[0] == "apply") {
+	if len(args) > 0 && (args[0] == "render" || args[0] == "apply" || args[0] == "cleanup") {
 		verb = args[0]
 		args = args[1:]
 	}
@@ -3255,6 +3255,11 @@ func runAWSIAMCommand(args []string, out, diagnostics io.Writer) int {
 	var cfg tuple.IAMConfig
 	fs.StringVar(&cfg.Tuple, "tuple", "k0s + calico,bgp + aws", "platform tuple expression")
 	fs.StringVar(&cfg.Scope, "scope", "account", "IAM scope: 'account' (shared clusterawsadm roles + AWS-Managed Policies across all clusters) or 'cluster' (isolated per-cluster roles)")
+	fs.StringVar(&cfg.BundleID, "bundle-id", "", "optional explicit IAM bundle ownership tag ID")
+	fs.Func("migrate-from-bundle", "legacy IAM bundle ID whose obsolete Customer Managed Policies may be detached and pruned during apply (repeatable)", func(v string) error {
+		cfg.MigrateFromBundles = append(cfg.MigrateFromBundles, v)
+		return nil
+	})
 	fs.StringVar(&cfg.AccountID, "account-id", "", "AWS 12-digit account ID (auto-detected via STS when omitted)")
 	fs.StringVar(&cfg.Region, "region", "", "AWS region (auto-discovered from AWSCluster when --kubeconfig is set)")
 	fs.StringVar(&cfg.ClusterName, "cluster", "", "CAPI cluster name (auto-discovered from AWSCluster when --kubeconfig is set)")
@@ -3349,8 +3354,25 @@ func runAWSIAMCommand(args []string, out, diagnostics io.Writer) int {
 		_ = enc.Encode(report)
 		return 0
 
+	case "cleanup":
+		iamClient, acct, err := awsiam.NewClientFromDefaultConfig(ctx, cfg.Region)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		if cfg.AccountID == "" {
+			cfg.AccountID = acct
+		}
+		report, _, err := tuple.CleanupIAMBundle(ctx, iamClient, cl, cfg, *dryRun)
+		if err != nil {
+			fmt.Fprintln(diagnostics, err)
+			return 1
+		}
+		_ = enc.Encode(report)
+		return 0
+
 	default:
-		fmt.Fprintf(diagnostics, "unknown iam verb %q (expected render or apply)\n", verb)
+		fmt.Fprintf(diagnostics, "unknown iam verb %q (expected render, apply, or cleanup)\n", verb)
 		return 2
 	}
 }

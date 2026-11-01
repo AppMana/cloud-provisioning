@@ -67,7 +67,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	fs.BoolVar(&winOpts.ExcludeCloudWorkers, "exclude-cloud-workers", false, "exclude cloud-worker role from calico-node-windows")
 	fs.BoolVar(&winOpts.Offline, "offline", false, "set ImagePullPolicy=Never")
 
-	mode := fs.String("mode", "check", "check, fix, iam-render, iam-apply, render, k0s-network, or validate-k0s-config")
+	mode := fs.String("mode", "check", "check, fix, iam-render, iam-apply, iam-cleanup, render, k0s-network, or validate-k0s-config")
 	tupleExpr := fs.String("tuple", "k0s + calico,bgp + aws", "platform tuple expression (e.g. \"k0s + calico,bgp + aws\")")
 	k0sConfigPath := fs.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
 	valuesPath := fs.String("values", "", "optional Helm values.yaml path to inspect for cloud-provisioning configuration")
@@ -93,6 +93,11 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 
 	var iamCfg tuple.IAMConfig
 	fs.StringVar(&iamCfg.Scope, "aws-iam-scope", "account", "IAM scope: 'account' (shared clusterawsadm roles + AWS-Managed Policies across all clusters) or 'cluster' (isolated per-cluster roles)")
+	fs.StringVar(&iamCfg.BundleID, "aws-iam-bundle-id", "", "optional explicit IAM bundle ownership tag ID (defaults to 'account' or --aws-role-prefix)")
+	fs.Func("aws-migrate-from-bundle", "legacy IAM bundle ID whose obsolete Customer Managed Policies may be detached and pruned during iam-apply (repeatable)", func(v string) error {
+		iamCfg.MigrateFromBundles = append(iamCfg.MigrateFromBundles, v)
+		return nil
+	})
 	fs.StringVar(&iamCfg.AccountID, "aws-account-id", "", "AWS 12-digit account ID (auto-detected via STS in iam-apply when omitted)")
 	fs.StringVar(&iamCfg.Region, "aws-region", "", "AWS region for IAM policy scoping (auto-discovered from AWSCluster when --kubeconfig is set)")
 	fs.StringVar(&iamCfg.ClusterName, "aws-cluster", "", "CAPI cluster name for IAM tag scoping (auto-discovered from AWSCluster when --kubeconfig is set)")
@@ -124,7 +129,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 
 	isVerb := func(v string) bool {
 		switch v {
-		case "check", "fix", "iam-render", "iam-apply", "render", "k0s-network", "validate-k0s-config":
+		case "check", "fix", "iam-render", "iam-apply", "iam-cleanup", "render", "k0s-network", "validate-k0s-config":
 			return true
 		default:
 			return false
@@ -331,6 +336,33 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 			iamCfg.AccountID = acct
 		}
 		report, _, err := tuple.ApplyIAMBundle(ctx, iamClient, cl, cl, iamCfg, *dryRun)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(report)
+
+	case "iam-cleanup":
+		iamCfg.Tuple = *tupleExpr
+		var cl client.Client
+		if *kubeconfig != "" {
+			var err error
+			cl, _, err = newKubeClient()
+			if err != nil {
+				return err
+			}
+		}
+		ctx, cancel := context.WithTimeout(ctx, *timeout)
+		defer cancel()
+		iamClient, acct, err := awsiam.NewClientFromDefaultConfig(ctx, iamCfg.Region)
+		if err != nil {
+			return err
+		}
+		if iamCfg.AccountID == "" {
+			iamCfg.AccountID = acct
+		}
+		report, _, err := tuple.CleanupIAMBundle(ctx, iamClient, cl, iamCfg, *dryRun)
 		if err != nil {
 			return err
 		}

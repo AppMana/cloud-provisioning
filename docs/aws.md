@@ -1379,3 +1379,56 @@ All three installation workflows use the same embedded Go reconciler
 3. **Controller Startup Flag (`--aws-iam-bootstrap`)**:
    Pass `--aws-iam-bootstrap --aws-iam-scope=account` to `endpoint-controller` to reconcile the IAM bundle on startup before starting the manager loops.
 
+### 5. Canonical IAM resource tagging, schema migrations, and safe cleanup
+
+Every Customer Managed Policy, IAM Role, and EC2 Instance Profile created or
+reconciled by `cloud-provisioning` is stamped with canonical ownership and
+version tags (and existing resources have missing/drifted tags reconciled
+automatically during `iam-apply`):
+
+| Tag Key | Value | Purpose |
+|---|---|---|
+| `cloud-provisioning.appmana.com/managed-by` | `cloud-provisioning` | Proves the resource is managed by `cloud-provisioning` (never touches unowned/handcrafted IAM resources) |
+| `cloud-provisioning.appmana.com/iam-schema` | `v1` | Schema version for future policy/role layout migrations |
+| `cloud-provisioning.appmana.com/iam-scope` | `account` or `cluster` | Distinguishes shared account-wide resources from per-cluster resources |
+| `cloud-provisioning.appmana.com/iam-bundle` | `account` (or `<prefix>` / `<cluster>`) | Groups all policies, roles, and instance profiles belonging to a single logical installation or test run |
+| `cloud-provisioning.appmana.com/iam-component` | `account-controllers`, `nodes`, `ami-operator`, etc. | Identifies the exact role or policy slot within the bundle |
+| `cloud-provisioning.appmana.com/spec-sha256` | 16-char hex digest | Fast drift detection against the rendered policy or trust document |
+| `sigs.k8s.io/cluster-api-provider-aws/managed` | `true` | Upstream CAPA (`clusterawsadm`) management marker |
+
+- **Automatic Migration & Orphan Policy Pruning (`--aws-migrate-from-bundle`)**:
+  During `Reconcile` (`iam-apply`), any Customer Managed Policy attached to a
+  role in the bundle that is no longer part of the desired `ManagedPolicyARNs`
+  is inspected. If its tags prove `managed-by=cloud-provisioning` and its
+  `iam-bundle` matches either the current `BundleID` or any bundle passed via
+  `--aws-migrate-from-bundle <legacy-bundle-id>`, `Reconcile` detaches it,
+  deletes its non-default versions, and deletes the obsolete Customer Managed
+  Policy automatically while leaving foreign/handcrafted policies untouched.
+- **Safe Tag-Verified Cleanup (`iam-cleanup` / `endpoint-controller iam cleanup`)**:
+  ```sh
+  go run ./cmd/platform-tuple iam-cleanup \
+    --tuple "k0s + calico,bgp,windows + aws,aws-vpc" \
+    --aws-iam-scope cluster --aws-cluster old-cluster
+  ```
+  `Cleanup` removes the Instance Profile, Roles, and Customer Managed Policies
+  in reverse dependency order **only** after verifying that each resource's live
+  AWS IAM tags match `managed-by=cloud-provisioning` and `iam-bundle=<bundleID>`.
+  Untagged or foreign-bundle resources are recorded in `skippedUnowned` and
+  never deleted, and official `arn:aws:iam::aws:policy/*` policies are only
+  detached, never deleted.
+
+### 6. Live AWS IAM integration test
+
+[`controller/pkg/platform/aws/iam/integration_test.go`](../controller/pkg/platform/aws/iam/integration_test.go)
+exercises the complete lifecycle against the live AWS IAM API using an isolated,
+random `cp-it-<hex>` bundle prefix (creating real Customer Managed Policies,
+attaching all 6 official AWS-Managed Policies, creating Roles and the EC2
+Instance Profile, verifying zero drift via `Audit`, simulating tag drift +
+legacy policy migration pruning, and running tag-verified `Cleanup`):
+
+```sh
+cd controller
+CLOUD_PROVISIONING_AWS_IAM_INTEGRATION=1 go test -v ./pkg/platform/aws/iam/... -run TestLiveAWSIAMAccountBundleLifecycleMigrationAndCleanup
+```
+
+

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -162,16 +163,81 @@ func (c *Client) GetPolicyVersionDocument(ctx context.Context, arn, versionID st
 	return decoded, nil
 }
 
-func (c *Client) CreatePolicy(ctx context.Context, name, description, document string) (string, error) {
+func addTagParams(params map[string]string, tags map[string]string) {
+	if len(tags) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(tags))
+	for k := range tags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for i, k := range keys {
+		idx := i + 1
+		params[fmt.Sprintf("Tags.member.%d.Key", idx)] = k
+		params[fmt.Sprintf("Tags.member.%d.Value", idx)] = tags[k]
+	}
+}
+
+type xmlTagMember struct {
+	Key   string `xml:"Key"`
+	Value string `xml:"Value"`
+}
+
+func tagsMap(members []xmlTagMember) map[string]string {
+	out := make(map[string]string, len(members))
+	for _, m := range members {
+		if m.Key != "" {
+			out[m.Key] = m.Value
+		}
+	}
+	return out
+}
+
+func (c *Client) CreatePolicy(ctx context.Context, name, description, document string, tags map[string]string) (string, error) {
 	var resp struct {
 		Arn string `xml:"CreatePolicyResult>Policy>Arn"`
 	}
-	_, _, err := c.call(ctx, "CreatePolicy", map[string]string{
+	params := map[string]string{
 		"PolicyName":     name,
 		"Description":    description,
 		"PolicyDocument": document,
-	}, &resp)
+	}
+	addTagParams(params, tags)
+	_, _, err := c.call(ctx, "CreatePolicy", params, &resp)
 	return resp.Arn, err
+}
+
+func (c *Client) ListPolicyTags(ctx context.Context, arn string) (map[string]string, error) {
+	var resp struct {
+		Tags []xmlTagMember `xml:"ListPolicyTagsResult>Tags>member"`
+	}
+	_, code, err := c.call(ctx, "ListPolicyTags", map[string]string{"PolicyArn": arn}, &resp)
+	if code == "NoSuchEntity" {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tagsMap(resp.Tags), nil
+}
+
+func (c *Client) TagPolicy(ctx context.Context, arn string, tags map[string]string) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	params := map[string]string{"PolicyArn": arn}
+	addTagParams(params, tags)
+	_, _, err := c.call(ctx, "TagPolicy", params, nil)
+	return err
+}
+
+func (c *Client) DeletePolicy(ctx context.Context, arn string) error {
+	_, code, err := c.call(ctx, "DeletePolicy", map[string]string{"PolicyArn": arn}, nil)
+	if code == "NoSuchEntity" {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) ListPolicyVersions(ctx context.Context, arn string) ([]PolicyVersion, error) {
@@ -198,10 +264,13 @@ func (c *Client) ListPolicyVersions(ctx context.Context, arn string) ([]PolicyVe
 }
 
 func (c *Client) DeletePolicyVersion(ctx context.Context, arn, versionID string) error {
-	_, _, err := c.call(ctx, "DeletePolicyVersion", map[string]string{
+	_, code, err := c.call(ctx, "DeletePolicyVersion", map[string]string{
 		"PolicyArn": arn,
 		"VersionId": versionID,
 	}, nil)
+	if code == "NoSuchEntity" {
+		return nil
+	}
 	return err
 }
 
@@ -242,15 +311,17 @@ func (c *Client) GetRole(ctx context.Context, name string) (bool, string, error)
 	return true, doc, nil
 }
 
-func (c *Client) CreateRole(ctx context.Context, name, description, assumeRoleDoc string) (string, error) {
+func (c *Client) CreateRole(ctx context.Context, name, description, assumeRoleDoc string, tags map[string]string) (string, error) {
 	var resp struct {
 		Arn string `xml:"CreateRoleResult>Role>Arn"`
 	}
-	_, _, err := c.call(ctx, "CreateRole", map[string]string{
+	params := map[string]string{
 		"RoleName":                 name,
 		"Description":              description,
 		"AssumeRolePolicyDocument": assumeRoleDoc,
-	}, &resp)
+	}
+	addTagParams(params, tags)
+	_, _, err := c.call(ctx, "CreateRole", params, &resp)
 	return resp.Arn, err
 }
 
@@ -287,6 +358,49 @@ func (c *Client) AttachRolePolicy(ctx context.Context, roleName, policyARN strin
 	return err
 }
 
+func (c *Client) DetachRolePolicy(ctx context.Context, roleName, policyARN string) error {
+	_, code, err := c.call(ctx, "DetachRolePolicy", map[string]string{
+		"RoleName":  roleName,
+		"PolicyArn": policyARN,
+	}, nil)
+	if code == "NoSuchEntity" {
+		return nil
+	}
+	return err
+}
+
+func (c *Client) ListRoleTags(ctx context.Context, name string) (map[string]string, error) {
+	var resp struct {
+		Tags []xmlTagMember `xml:"ListRoleTagsResult>Tags>member"`
+	}
+	_, code, err := c.call(ctx, "ListRoleTags", map[string]string{"RoleName": name}, &resp)
+	if code == "NoSuchEntity" {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tagsMap(resp.Tags), nil
+}
+
+func (c *Client) TagRole(ctx context.Context, name string, tags map[string]string) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	params := map[string]string{"RoleName": name}
+	addTagParams(params, tags)
+	_, _, err := c.call(ctx, "TagRole", params, nil)
+	return err
+}
+
+func (c *Client) DeleteRole(ctx context.Context, name string) error {
+	_, code, err := c.call(ctx, "DeleteRole", map[string]string{"RoleName": name}, nil)
+	if code == "NoSuchEntity" {
+		return nil
+	}
+	return err
+}
+
 func (c *Client) GetInstanceProfile(ctx context.Context, name string) (*InstanceProfile, error) {
 	var resp struct {
 		Profile struct {
@@ -314,11 +428,13 @@ func (c *Client) GetInstanceProfile(ctx context.Context, name string) (*Instance
 	return prof, nil
 }
 
-func (c *Client) CreateInstanceProfile(ctx context.Context, name string) (string, error) {
+func (c *Client) CreateInstanceProfile(ctx context.Context, name string, tags map[string]string) (string, error) {
 	var resp struct {
 		Arn string `xml:"CreateInstanceProfileResult>InstanceProfile>Arn"`
 	}
-	_, _, err := c.call(ctx, "CreateInstanceProfile", map[string]string{"InstanceProfileName": name}, &resp)
+	params := map[string]string{"InstanceProfileName": name}
+	addTagParams(params, tags)
+	_, _, err := c.call(ctx, "CreateInstanceProfile", params, &resp)
 	return resp.Arn, err
 }
 
@@ -327,5 +443,48 @@ func (c *Client) AddRoleToInstanceProfile(ctx context.Context, profileName, role
 		"InstanceProfileName": profileName,
 		"RoleName":            roleName,
 	}, nil)
+	return err
+}
+
+func (c *Client) RemoveRoleFromInstanceProfile(ctx context.Context, profileName, roleName string) error {
+	_, code, err := c.call(ctx, "RemoveRoleFromInstanceProfile", map[string]string{
+		"InstanceProfileName": profileName,
+		"RoleName":            roleName,
+	}, nil)
+	if code == "NoSuchEntity" {
+		return nil
+	}
+	return err
+}
+
+func (c *Client) ListInstanceProfileTags(ctx context.Context, name string) (map[string]string, error) {
+	var resp struct {
+		Tags []xmlTagMember `xml:"ListInstanceProfileTagsResult>Tags>member"`
+	}
+	_, code, err := c.call(ctx, "ListInstanceProfileTags", map[string]string{"InstanceProfileName": name}, &resp)
+	if code == "NoSuchEntity" {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tagsMap(resp.Tags), nil
+}
+
+func (c *Client) TagInstanceProfile(ctx context.Context, name string, tags map[string]string) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	params := map[string]string{"InstanceProfileName": name}
+	addTagParams(params, tags)
+	_, _, err := c.call(ctx, "TagInstanceProfile", params, nil)
+	return err
+}
+
+func (c *Client) DeleteInstanceProfile(ctx context.Context, name string) error {
+	_, code, err := c.call(ctx, "DeleteInstanceProfile", map[string]string{"InstanceProfileName": name}, nil)
+	if code == "NoSuchEntity" {
+		return nil
+	}
 	return err
 }

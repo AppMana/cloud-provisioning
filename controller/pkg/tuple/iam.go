@@ -14,6 +14,8 @@ import (
 type IAMConfig struct {
 	Tuple                 string
 	Scope                 string
+	BundleID              string
+	MigrateFromBundles    []string
 	AccountID             string
 	Region                string
 	ClusterName           string
@@ -54,6 +56,8 @@ func BuildIAMOptions(ctx context.Context, reader client.Reader, cfg IAMConfig) (
 	}
 	opts := awsiam.Options{
 		Scope:                 cfg.Scope,
+		BundleID:              cfg.BundleID,
+		MigrateFromBundles:    cfg.MigrateFromBundles,
 		AccountID:             cfg.AccountID,
 		Region:                cfg.Region,
 		ClusterName:           cfg.ClusterName,
@@ -118,4 +122,15 @@ func ApplyIAMBundle(ctx context.Context, api awsiam.API, writer client.Client, r
 		}
 	}
 	return report, bundle, nil
+}
+
+// CleanupIAMBundle safely tears down all tagged IAM policies, roles, and instance
+// profile in the rendered bundle after verifying ownership tags on every resource.
+func CleanupIAMBundle(ctx context.Context, api awsiam.API, reader client.Reader, cfg IAMConfig, dryRun bool) (*awsiam.CleanupReport, *awsiam.Bundle, error) {
+	bundle, err := RenderIAMBundle(ctx, reader, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	report, err := awsiam.Cleanup(ctx, api, bundle, dryRun)
+	return report, bundle, err
 }

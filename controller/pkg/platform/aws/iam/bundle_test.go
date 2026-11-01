@@ -160,9 +160,12 @@ func TestRenderAccountWideCAPIBundleWithAWSManagedPolicies(t *testing.T) {
 type fakeIAM struct {
 	policies         map[string]string
 	policyVersions   map[string][]PolicyVersion
+	policyTags       map[string]map[string]string
 	roles            map[string]string
 	roleAttachments  map[string][]string
+	roleTags         map[string]map[string]string
 	instanceProfiles map[string]*InstanceProfile
+	profileTags      map[string]map[string]string
 	deletedVersions  []string
 }
 
@@ -170,10 +173,21 @@ func newFakeIAM() *fakeIAM {
 	return &fakeIAM{
 		policies:         map[string]string{},
 		policyVersions:   map[string][]PolicyVersion{},
+		policyTags:       map[string]map[string]string{},
 		roles:            map[string]string{},
 		roleAttachments:  map[string][]string{},
+		roleTags:         map[string]map[string]string{},
 		instanceProfiles: map[string]*InstanceProfile{},
+		profileTags:      map[string]map[string]string{},
 	}
+}
+
+func copyTags(src map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
 }
 
 func (f *fakeIAM) GetPolicy(_ context.Context, arn string) (bool, string, error) {
@@ -193,11 +207,33 @@ func (f *fakeIAM) GetPolicyVersionDocument(_ context.Context, arn, _ string) (st
 	return f.policies[arn], nil
 }
 
-func (f *fakeIAM) CreatePolicy(_ context.Context, name, _, document string) (string, error) {
+func (f *fakeIAM) CreatePolicy(_ context.Context, name, _, document string, tags map[string]string) (string, error) {
 	arn := "arn:aws:iam::123456789012:policy/" + name
 	f.policies[arn] = document
 	f.policyVersions[arn] = []PolicyVersion{{VersionID: "v1", IsDefaultVersion: true}}
+	f.policyTags[arn] = copyTags(tags)
 	return arn, nil
+}
+
+func (f *fakeIAM) ListPolicyTags(_ context.Context, arn string) (map[string]string, error) {
+	return copyTags(f.policyTags[arn]), nil
+}
+
+func (f *fakeIAM) TagPolicy(_ context.Context, arn string, tags map[string]string) error {
+	if f.policyTags[arn] == nil {
+		f.policyTags[arn] = map[string]string{}
+	}
+	for k, v := range tags {
+		f.policyTags[arn][k] = v
+	}
+	return nil
+}
+
+func (f *fakeIAM) DeletePolicy(_ context.Context, arn string) error {
+	delete(f.policies, arn)
+	delete(f.policyVersions, arn)
+	delete(f.policyTags, arn)
+	return nil
 }
 
 func (f *fakeIAM) ListPolicyVersions(_ context.Context, arn string) ([]PolicyVersion, error) {
@@ -236,8 +272,9 @@ func (f *fakeIAM) GetRole(_ context.Context, name string) (bool, string, error) 
 	return ok, doc, nil
 }
 
-func (f *fakeIAM) CreateRole(_ context.Context, name, _, assumeRoleDoc string) (string, error) {
+func (f *fakeIAM) CreateRole(_ context.Context, name, _, assumeRoleDoc string, tags map[string]string) (string, error) {
 	f.roles[name] = assumeRoleDoc
+	f.roleTags[name] = copyTags(tags)
 	return "arn:aws:iam::123456789012:role/" + name, nil
 }
 
@@ -247,7 +284,7 @@ func (f *fakeIAM) UpdateAssumeRolePolicy(_ context.Context, name, assumeRoleDoc 
 }
 
 func (f *fakeIAM) ListAttachedRolePolicies(_ context.Context, roleName string) ([]string, error) {
-	return f.roleAttachments[roleName], nil
+	return slices.Clone(f.roleAttachments[roleName]), nil
 }
 
 func (f *fakeIAM) AttachRolePolicy(_ context.Context, roleName, policyARN string) error {
@@ -255,19 +292,87 @@ func (f *fakeIAM) AttachRolePolicy(_ context.Context, roleName, policyARN string
 	return nil
 }
 
+func (f *fakeIAM) DetachRolePolicy(_ context.Context, roleName, policyARN string) error {
+	var kept []string
+	for _, a := range f.roleAttachments[roleName] {
+		if a != policyARN {
+			kept = append(kept, a)
+		}
+	}
+	f.roleAttachments[roleName] = kept
+	return nil
+}
+
+func (f *fakeIAM) ListRoleTags(_ context.Context, name string) (map[string]string, error) {
+	return copyTags(f.roleTags[name]), nil
+}
+
+func (f *fakeIAM) TagRole(_ context.Context, name string, tags map[string]string) error {
+	if f.roleTags[name] == nil {
+		f.roleTags[name] = map[string]string{}
+	}
+	for k, v := range tags {
+		f.roleTags[name][k] = v
+	}
+	return nil
+}
+
+func (f *fakeIAM) DeleteRole(_ context.Context, name string) error {
+	delete(f.roles, name)
+	delete(f.roleAttachments, name)
+	delete(f.roleTags, name)
+	return nil
+}
+
 func (f *fakeIAM) GetInstanceProfile(_ context.Context, name string) (*InstanceProfile, error) {
 	return f.instanceProfiles[name], nil
 }
 
-func (f *fakeIAM) CreateInstanceProfile(_ context.Context, name string) (string, error) {
+func (f *fakeIAM) CreateInstanceProfile(_ context.Context, name string, tags map[string]string) (string, error) {
 	arn := "arn:aws:iam::123456789012:instance-profile/" + name
 	f.instanceProfiles[name] = &InstanceProfile{Name: name, ARN: arn}
+	f.profileTags[name] = copyTags(tags)
 	return arn, nil
 }
 
 func (f *fakeIAM) AddRoleToInstanceProfile(_ context.Context, profileName, roleName string) error {
 	prof := f.instanceProfiles[profileName]
 	prof.RoleNames = append(prof.RoleNames, roleName)
+	return nil
+}
+
+func (f *fakeIAM) RemoveRoleFromInstanceProfile(_ context.Context, profileName, roleName string) error {
+	prof := f.instanceProfiles[profileName]
+	if prof == nil {
+		return nil
+	}
+	var kept []string
+	for _, r := range prof.RoleNames {
+		if r != roleName {
+			kept = append(kept, r)
+		}
+	}
+	prof.RoleNames = kept
+	return nil
+}
+
+func (f *fakeIAM) ListInstanceProfileTags(_ context.Context, name string) (map[string]string, error) {
+	return copyTags(f.profileTags[name]), nil
+}
+
+func (f *fakeIAM) TagInstanceProfile(_ context.Context, name string, tags map[string]string) error {
+	if f.profileTags[name] == nil {
+		f.profileTags[name] = map[string]string{}
+	}
+	for k, v := range tags {
+		f.profileTags[name][k] = v
+	}
+	return nil
+}
+
+func (f *fakeIAM) DeleteInstanceProfile(_ context.Context, name string) error {
+	delete(f.instanceProfiles, name)
+	delete(f.profileTags, name)
 	return nil
 }
 
@@ -338,6 +443,113 @@ func TestReconcileAndAuditIAMBundleWithVersionPruning(t *testing.T) {
 	}
 	if len(report2.Changes) != 0 {
 		t.Errorf("expected second Reconcile to be idempotent with 0 changes, got %v", report2.Changes)
+	}
+}
+
+func TestTagDriftMigrationPruningAndSafeCleanup(t *testing.T) {
+	ctx := context.Background()
+	api := newFakeIAM()
+
+	// 1. Render and reconcile an account-wide bundle with rolePrefix "canary-v1"
+	bundle, err := Render(Options{
+		Scope:                 "account",
+		AccountID:             "123456789012",
+		RolePrefix:            "canary-v1",
+		MigrateFromBundles:    []string{"legacy-cluster-a"},
+		IncludeWindows:        true,
+		IncludeVPCCNI:         true,
+		IncludeAMILifecycle:   true,
+		IncludeAMIPerformance: true,
+		IncludeObservability:  true,
+		Tags: map[string]string{
+			"cloud-provisioning.appmana.com/environment": "test",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	// Pre-attach two extra policies to the controllers role:
+	//  (a) a legacy Customer Managed Policy owned by "legacy-cluster-a" -> should be detached & pruned!
+	//  (b) a foreign Customer Managed Policy NOT managed by cloud-provisioning -> must be left untouched!
+	legacyPolARN := "arn:aws:iam::123456789012:policy/legacy-cluster-a-capa-provisioning"
+	api.policies[legacyPolARN] = `{"Version":"2012-10-17","Statement":[]}`
+	api.policyVersions[legacyPolARN] = []PolicyVersion{
+		{VersionID: "v1", IsDefaultVersion: false},
+		{VersionID: "v2", IsDefaultVersion: true},
+	}
+	api.policyTags[legacyPolARN] = map[string]string{
+		TagManagedBy: ManagedByValue,
+		TagBundleID:  "legacy-cluster-a",
+	}
+
+	foreignPolARN := "arn:aws:iam::123456789012:policy/customer-handcrafted-audit-policy"
+	api.policies[foreignPolARN] = `{"Version":"2012-10-17","Statement":[]}`
+	api.policyVersions[foreignPolARN] = []PolicyVersion{{VersionID: "v1", IsDefaultVersion: true}}
+	api.policyTags[foreignPolARN] = map[string]string{
+		"team": "secops",
+	}
+
+	ctrlRoleName := bundle.Roles[0].Name
+	api.roles[ctrlRoleName] = bundle.Roles[0].AssumeRolePolicyDoc
+	api.roleAttachments[ctrlRoleName] = []string{legacyPolARN, foreignPolARN}
+	// Omit tags on pre-existing role to verify tag drift reconciliation
+	api.roleTags[ctrlRoleName] = map[string]string{}
+
+	rep, err := Reconcile(ctx, api, bundle, false)
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if !slices.Contains(rep.PoliciesPruned, legacyPolARN) {
+		t.Errorf("expected legacy policy %s to be pruned during migration, got %v", legacyPolARN, rep.PoliciesPruned)
+	}
+	if _, stillThere := api.policies[legacyPolARN]; stillThere {
+		t.Errorf("expected legacy policy %s to be deleted from IAM", legacyPolARN)
+	}
+	if _, foreignStillThere := api.policies[foreignPolARN]; !foreignStillThere {
+		t.Errorf("expected foreign unowned policy %s to be preserved", foreignPolARN)
+	}
+	if !slices.Contains(api.roleAttachments[ctrlRoleName], foreignPolARN) {
+		t.Errorf("expected foreign unowned policy %s to remain attached to %s", foreignPolARN, ctrlRoleName)
+	}
+	if !slices.Contains(rep.TagsReconciled, bundle.Roles[0].ARN) {
+		t.Errorf("expected pre-existing untagged role %s to have tags reconciled, got %v", bundle.Roles[0].ARN, rep.TagsReconciled)
+	}
+
+	// Verify Audit passes with 0 findings
+	if findings, err := Audit(ctx, api, bundle); err != nil || len(findings) != 0 {
+		t.Fatalf("expected 0 Audit findings, got %v (err=%v)", findings, err)
+	}
+
+	// Tamper with one policy's tag to verify Audit detects tag drift and Reconcile repairs it
+	polARN := bundle.Policies[0].ARN
+	api.policyTags[polARN][TagSchemaVersion] = "v0-beta"
+	findings, err := Audit(ctx, api, bundle)
+	if err != nil || len(findings) != 1 {
+		t.Fatalf("expected 1 Audit finding for tag drift, got %v (err=%v)", findings, err)
+	}
+	repDrift, err := Reconcile(ctx, api, bundle, false)
+	if err != nil || !slices.Contains(repDrift.TagsReconciled, polARN) {
+		t.Fatalf("expected Reconcile to repair drifted tag on %s, got %+v (err=%v)", polARN, repDrift, err)
+	}
+
+	// Tamper with the AMI operator role's bundle tag to simulate a foreign resource sharing a name:
+	// Cleanup must refuse to delete that role while cleanly deleting all owned resources.
+	amiRole := bundle.Roles[len(bundle.Roles)-1]
+	api.roleTags[amiRole.Name][TagBundleID] = "some-other-bundle"
+
+	cleanRep, err := Cleanup(ctx, api, bundle, false)
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if !slices.Contains(cleanRep.SkippedUnowned, amiRole.ARN) {
+		t.Errorf("expected foreign-tagged role %s to be skipped in Cleanup, got %v", amiRole.ARN, cleanRep.SkippedUnowned)
+	}
+	if len(cleanRep.InstanceProfilesDeleted) != 1 {
+		t.Errorf("expected 1 instance profile deleted, got %v", cleanRep.InstanceProfilesDeleted)
+	}
+	if len(cleanRep.PoliciesDeleted) != len(bundle.Policies) {
+		t.Errorf("expected %d policies deleted, got %v", len(bundle.Policies), cleanRep.PoliciesDeleted)
 	}
 }
 

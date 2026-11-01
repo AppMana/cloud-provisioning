@@ -73,6 +73,19 @@ type CheckOptions struct {
 	// NodeVethMTUs is an optional map of nodeName -> (cali* veth name -> live MTU)
 	// used to detect pre-existing pod veth interfaces that still carry a stale MTU.
 	NodeVethMTUs map[string]map[string]int
+	// NodeTailscaleRules is an optional map of nodeName -> TailscaleRuleStatus
+	// used to detect whether Calico's 0x80000 fwmark collides with Tailscale's
+	// rule 5210 without a priority-5200 override to table 52.
+	NodeTailscaleRules map[string]site.TailscaleRuleStatus
+}
+
+// TailscaleRuleStatus aliases site.TailscaleRuleStatus for CLI callers.
+type TailscaleRuleStatus = site.TailscaleRuleStatus
+
+// ParseTailscaleRuleStatus parses `ip -o link show`, `ip -4 rule show`, and
+// `ip -6 rule show` output to detect Tailscale/Calico fwmark rule collisions.
+func ParseTailscaleRuleStatus(ipLinkOutput, ipRule4Output, ipRule6Output string) TailscaleRuleStatus {
+	return site.ParseTailscaleRuleStatus(ipLinkOutput, ipRule4Output, ipRule6Output)
 }
 
 // Passed reports whether every CheckResult succeeded (including checks with warnings).
@@ -281,8 +294,11 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 	out = append(out, checkBGPPeers(ctx, c, parsedTuple, opts.StrictBGPPeerScope))
 	out = append(out, checkMasqueradeAndProviderPools(ctx, c, network))
 	out = append(out, checkBorrowedAddresses(ctx, c))
-	out = append(out, checkTunnelRanges(ctx, c, dualStack, opts.TunnelIPv4, opts.TunnelIPv6))
-	out = append(out, checkEndpointCandidates(ctx, c))
+	out = append(out, checkTunnelRanges(ctx, c, dualStack, opts.TunnelIPv4, opts.TunnelIPv6, opts.NodeTailscaleRules))
+	out = append(out, checkEndpointCandidates(ctx, c, opts.ValuesYAML))
+	if tsRes, ok := checkTailscaleCalicoRules(opts.NodeTailscaleRules); ok {
+		out = append(out, tsRes)
+	}
 	if workloadRes, ok := checkCloudWorkerWorkloads(ctx, c); ok {
 		out = append(out, workloadRes)
 	}
@@ -469,10 +485,53 @@ func checkCalicoAutodetection(ctx context.Context, c client.Reader, tunnelV4, tu
 			return CheckResult{Name: "calico-autodetection", Pass: false, Detail: err.Error()}
 		}
 	}
+	var warnings []string
+	var nodes corev1.NodeList
+	if err := c.List(ctx, &nodes); err == nil {
+		for _, n := range nodes.Items {
+			if n.Labels[platform.RoleLabel] == platform.RoleValue {
+				continue
+			}
+			var v4Internal, v6Internal string
+			for _, a := range n.Status.Addresses {
+				if a.Type != corev1.NodeInternalIP {
+					continue
+				}
+				if ip, err := netip.ParseAddr(strings.TrimSpace(a.Address)); err == nil {
+					if ip.Is4() && v4Internal == "" {
+						v4Internal = ip.String()
+					} else if ip.Is6() && v6Internal == "" {
+						v6Internal = ip.String()
+					}
+				}
+			}
+			if raw4 := strings.TrimSpace(n.Annotations["projectcalico.org/IPv4Address"]); raw4 != "" && v4Internal != "" {
+				addr4 := strings.SplitN(raw4, "/", 2)[0]
+				if addr4 != v4Internal {
+					warnings = append(warnings, fmt.Sprintf(
+						"node %s projectcalico.org/IPv4Address=%q differs from Kubernetes InternalIP %s (verify IP_AUTODETECTION_METHOD=%q does not match a secondary VIP or non-primary interface)",
+						n.Name, raw4, v4Internal, v4Method,
+					))
+				}
+			}
+			if dualStack && v6Internal != "" {
+				if raw6 := strings.TrimSpace(n.Annotations["projectcalico.org/IPv6Address"]); raw6 != "" {
+					addr6 := strings.SplitN(raw6, "/", 2)[0]
+					if addr6 != v6Internal {
+						warnings = append(warnings, fmt.Sprintf(
+							"node %s projectcalico.org/IPv6Address=%q differs from Kubernetes InternalIP %s (IP6_AUTODETECTION_METHOD=%q matched a SLAAC or secondary VIP address)",
+							n.Name, raw6, v6Internal, v6Method,
+						))
+					}
+				}
+			}
+		}
+	}
 	return CheckResult{
-		Name:   "calico-autodetection",
-		Pass:   true,
-		Detail: fmt.Sprintf("v4=%q v6=%q", v4Method, v6Method),
+		Name:     "calico-autodetection",
+		Pass:     true,
+		Detail:   fmt.Sprintf("v4=%q v6=%q", v4Method, v6Method),
+		Warnings: warnings,
 	}
 }
 
@@ -825,7 +884,7 @@ func checkBorrowedAddresses(ctx context.Context, c client.Reader) CheckResult {
 	return CheckResult{Name: "borrowed-addresses", Pass: false, Detail: "borrowed IPAM addresses: " + strings.Join(parts, ", ")}
 }
 
-func checkTunnelRanges(ctx context.Context, c client.Reader, dualStack bool, tunnelV4, tunnelV6 string) CheckResult {
+func checkTunnelRanges(ctx context.Context, c client.Reader, dualStack bool, tunnelV4, tunnelV6 string, nodeTailscale map[string]site.TailscaleRuleStatus) CheckResult {
 	t4, err := netip.ParsePrefix(tunnelV4)
 	if err != nil {
 		return CheckResult{Name: "tunnel-ranges", Pass: false, Detail: err.Error()}
@@ -840,6 +899,15 @@ func checkTunnelRanges(ctx context.Context, c client.Reader, dualStack bool, tun
 	}
 	type used struct{ what, value string }
 	var uses []used
+	for _, ts := range nodeTailscale {
+		if ts.HasTailscale {
+			uses = append(uses,
+				used{"Tailscale CGNAT", "100.64.0.0/10"},
+				used{"Tailscale ULA", "fd7a:115c:a1e0::/48"},
+			)
+			break
+		}
+	}
 	pools := &unstructured.UnstructuredList{}
 	pools.SetGroupVersionKind(schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPoolList"})
 	if err := c.List(ctx, pools); err == nil {
@@ -896,12 +964,12 @@ func parseAddressOrPrefix(v string) (netip.Prefix, error) {
 	return netip.PrefixFrom(a, a.BitLen()), nil
 }
 
-func checkEndpointCandidates(ctx context.Context, c client.Reader) CheckResult {
+func checkEndpointCandidates(ctx context.Context, c client.Reader, valuesYAML []byte) CheckResult {
 	var nodes corev1.NodeList
 	if err := c.List(ctx, &nodes); err != nil {
 		return CheckResult{Name: "endpoint-candidates", Pass: false, Detail: err.Error()}
 	}
-	var readyLinux []string
+	var readyLinux, workerLinux, controlPlaneLinux []string
 	for _, n := range nodes.Items {
 		if n.Labels[platform.RoleLabel] == platform.RoleValue {
 			continue
@@ -910,12 +978,88 @@ func checkEndpointCandidates(ctx context.Context, c client.Reader) CheckResult {
 			continue
 		}
 		readyLinux = append(readyLinux, n.Name)
+		if platform.IsControlPlane(&n) {
+			controlPlaneLinux = append(controlPlaneLinux, n.Name)
+		} else {
+			workerLinux = append(workerLinux, n.Name)
+		}
+	}
+	selectsControlPlane := false
+	if len(valuesYAML) > 0 {
+		var doc map[string]interface{}
+		if yaml.Unmarshal(valuesYAML, &doc) == nil {
+			epSel, _, _ := unstructured.NestedString(doc, "tunnel", "endpoints")
+			epSel = strings.TrimSpace(epSel)
+			if strings.EqualFold(epSel, "all") || strings.Contains(epSel, "control-plane") || strings.Contains(epSel, "master") {
+				selectsControlPlane = true
+			}
+		}
+	}
+	var warnings []string
+	detail := fmt.Sprintf("candidates=%v", readyLinux)
+	if len(workerLinux) == 0 && len(controlPlaneLinux) > 0 && !selectsControlPlane {
+		if len(valuesYAML) > 0 {
+			return CheckResult{
+				Name:   "endpoint-candidates",
+				Pass:   false,
+				Detail: fmt.Sprintf("only control-plane node(s) %v are present, and values.yaml does not set tunnel.endpoints=\"all\" (endpoint-controller excludes control-plane nodes by default)", controlPlaneLinux),
+			}
+		}
+		warnings = append(warnings, fmt.Sprintf(
+			"only control-plane node(s) %v are present; endpoint-controller excludes control-plane nodes from terminating tunnels by default unless tunnel.endpoints=\"all\" is set in values.yaml",
+			controlPlaneLinux,
+		))
+	} else if len(workerLinux) > 0 && len(controlPlaneLinux) > 0 && !selectsControlPlane {
+		detail = fmt.Sprintf("candidates=%v (activeWorkers=%v controlPlaneTransit=%v)", readyLinux, workerLinux, controlPlaneLinux)
 	}
 	return CheckResult{
-		Name:   "endpoint-candidates",
-		Pass:   len(readyLinux) > 0,
-		Detail: fmt.Sprintf("candidates=%v", readyLinux),
+		Name:     "endpoint-candidates",
+		Pass:     len(readyLinux) > 0,
+		Detail:   detail,
+		Warnings: warnings,
 	}
+}
+
+func checkTailscaleCalicoRules(nodeRules map[string]site.TailscaleRuleStatus) (CheckResult, bool) {
+	if len(nodeRules) == 0 {
+		return CheckResult{}, false
+	}
+	var nodeNames []string
+	for n := range nodeRules {
+		nodeNames = append(nodeNames, n)
+	}
+	sort.Strings(nodeNames)
+	var tsNodes []string
+	var warnings []string
+	for _, nodeName := range nodeNames {
+		st := nodeRules[nodeName]
+		if !st.HasTailscale {
+			continue
+		}
+		tsNodes = append(tsNodes, nodeName)
+		var missing []string
+		if st.MissingV4() {
+			missing = append(missing, "IPv4 100.64.0.0/10")
+		}
+		if st.MissingV6() {
+			missing = append(missing, "IPv6 fd7a:115c:a1e0::/48")
+		}
+		if len(missing) > 0 {
+			warnings = append(warnings, fmt.Sprintf(
+				"node %s has tailscale0 with rule 5210 (fwmark 0x80000/0xff0000 lookup main) but is missing priority-5200 lookup 52 rule(s) for %s; Calico fwmark 0x80000 collides with rule 5210 and drops pod/NodePort replies to tailnet peers (run 'platform-tuple fix' to install in-place)",
+				nodeName, strings.Join(missing, " and "),
+			))
+		}
+	}
+	if len(tsNodes) == 0 {
+		return CheckResult{}, false
+	}
+	return CheckResult{
+		Name:     "tailscale-routing",
+		Pass:     true,
+		Detail:   fmt.Sprintf("tailscale0 present on %v (table 517 guards active)", tsNodes),
+		Warnings: warnings,
+	}, true
 }
 
 // InspectLinuxCalicoDaemonSet validates an unstructured kube-system/calico-node

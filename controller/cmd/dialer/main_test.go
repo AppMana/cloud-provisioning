@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -405,6 +406,76 @@ func TestParseAllowedIP_ABadEntryCostsOnlyItself(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("%s was dropped along with the endpoint entry", want)
+		}
+	}
+}
+
+func TestValidateProtectedDestination_ProtectsManagementAndDefaultGatewayRoutes(t *testing.T) {
+	local := []net.IP{net.ParseIP("10.19.3.10"), net.ParseIP("10.19.3.240")}
+	gateways := []net.IP{net.ParseIP("10.19.3.1"), net.ParseIP("fe80::1")}
+	protected := []netip.Prefix{
+		netip.MustParsePrefix("100.64.0.0/10"),
+		netip.MustParsePrefix("fd7a:115c:a1e0::/48"),
+	}
+
+	for _, tc := range []struct {
+		cidr   string
+		reason string
+	}{
+		{"0.0.0.0/0", "IPv4 default route"},
+		{"::/0", "IPv6 default route"},
+		{"127.0.0.1/32", "IPv4 loopback"},
+		{"::1/128", "IPv6 loopback"},
+		{"169.254.169.254/32", "AWS IMDS / IPv4 link-local"},
+		{"fe80::1234/128", "IPv6 link-local"},
+		{"224.0.0.1/32", "IPv4 multicast"},
+		{"ff02::1/128", "IPv6 multicast"},
+		{"10.19.3.1/32", "host default gateway"},
+		{"10.19.3.0/24", "LAN subnet containing host IP and default gateway"},
+		{"10.19.3.240/32", "host VIP on vip0"},
+		{"100.106.111.116/32", "Tailscale CGNAT management address"},
+		{"100.64.0.0/10", "Tailscale CGNAT prefix"},
+		{"fd7a:115c:a1e0::1/128", "Tailscale IPv6 ULA management address"},
+	} {
+		_, ipNet, err := net.ParseCIDR(tc.cidr)
+		if err != nil {
+			t.Fatalf("ParseCIDR(%q): %v", tc.cidr, err)
+		}
+		if err := validateProtectedDestination(*ipNet, local, gateways, protected); err == nil {
+			t.Errorf("validateProtectedDestination(%q) succeeded, expected rejection (%s)", tc.cidr, tc.reason)
+		}
+	}
+
+	for _, valid := range []string{
+		"10.100.0.1/32",
+		"10.244.12.0/24",
+		"172.31.10.25/32",
+		"fd8f:cf26:522b::1/128",
+	} {
+		_, ipNet, err := net.ParseCIDR(valid)
+		if err != nil {
+			t.Fatalf("ParseCIDR(%q): %v", valid, err)
+		}
+		if err := validateProtectedDestination(*ipNet, local, gateways, protected); err != nil {
+			t.Errorf("validateProtectedDestination(%q) unexpectedly failed: %v", valid, err)
+		}
+	}
+}
+
+func TestParseHostRoute_RefusesNonUnicastAddresses(t *testing.T) {
+	for _, bad := range []string{
+		"0.0.0.0",
+		"::",
+		"127.0.0.1",
+		"::1",
+		"169.254.169.254",
+		"fe80::1",
+		"224.0.0.1",
+		"ff02::1",
+		"255.255.255.255",
+	} {
+		if _, err := parseHostRoute(bad); err == nil {
+			t.Errorf("parseHostRoute(%q) succeeded, want error for reserved/non-global-unicast IP", bad)
 		}
 	}
 }

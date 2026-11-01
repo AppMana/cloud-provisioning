@@ -419,3 +419,20 @@ Ordinary-neighbor reconciliation must preserve a recently authenticated
 WireGuard endpoint when NAT has changed the published address or port. An
 absent, future, or stale handshake still permits the configured fallback, while
 endpoint preservation must never retain withdrawn keys or source permissions.
+
+## Remote management and route-table isolation safeguards
+
+Because `wg-dialer` installs policy routing rules at priority `517` (`not from all fwmark 0xca6c lookup 517`) ahead of `main` (`32766`) and ahead of Tailscale (`5200`–`5270`, table `52`, fwmark `0x80000/0xff0000`), any route installed into table `517` or BGP table `518` takes precedence over host LAN routes, default gateways, and tailnet management paths unless explicitly guarded. The dialer and `platform-tuple` enforce the following invariants:
+
+1. **Non-reserved and unicast destination enforcement (`wg-dialer`):**
+   - `parseAllowedIP`, `parseHostRoute`, `installRoutesWithPolicy`, `validateSiteTransit`, and BGP route construction (`hostRoute` / `blockRoute`) reject default routes (`0.0.0.0/0`, `::/0`), loopback (`127.0.0.0/8`, `::1/128`), link-local / cloud metadata (`169.254.0.0/16`, `fe80::/10`), multicast (`224.0.0.0/4`, `ff00::/8`), unspecified, and broadcast prefixes before touching netlink or WireGuard `AllowedIPs`.
+2. **Host address, default-gateway, and Tailscale prefix protection (`wg-dialer`):**
+   - Before adding any WireGuard `AllowedIP` or kernel route in table `517`, `validateProtectedDestination` queries `RT_TABLE_MAIN` for all IPv4/IPv6 default-gateway next-hops (`defaultGatewayIPs`), enumerates all local non-tunnel interface addresses (`localNonTunnelIPs`, including `vip0` dummy VIPs), and—whenever `tailscale0` is present on the host—protects Tailscale's CGNAT (`100.64.0.0/10`) and IPv6 ULA (`fd7a:115c:a1e0::/48`) prefixes (`tailscaleProtectedPrefixes`). Any peer `AllowedIP` or `routeHost` overlapping those addresses or prefixes is dropped individually without aborting valid peer routes.
+3. **Tailscale vs. Calico `fwmark 0x80000` collision detection and remediation (`platform-tuple check` / `fix`):**
+   - Both Tailscale (`rule 5210: from all fwmark 0x80000/0xff0000 lookup main`) and Calico Felix use `fwmark 0x80000`. Without priority `5200` rules (`to 100.64.0.0/10 lookup 52` and `to fd7a:115c:a1e0::/48 lookup 52`) ahead of rule `5210`, packets marked by Calico lookup `main` instead of table `52` and drop tailnet management/NodePort replies.
+   - `platform-tuple check` (`tailscale-routing`) inspects each running `kube-system/calico-node` network namespace for `tailscale0` and rule `5210`, warning if priority `5200` rules are missing, and `tunnel-ranges` fails if `TunnelIPv4`/`TunnelIPv6` overlap `100.64.0.0/10` or `fd7a:115c:a1e0::/48`.
+   - `platform-tuple fix` idempotently installs the missing priority `5200` IPv4/IPv6 rules in-place on affected nodes.
+4. **Calico IPv4/IPv6 autodetection and control-plane-only endpoint checks (`platform-tuple check`):**
+   - `calico-autodetection` compares each site node's `projectcalico.org/IPv4Address` and `projectcalico.org/IPv6Address` annotations against its Kubernetes `NodeInternalIP`s and warns when `IP6_AUTODETECTION_METHOD` matched a Wi-Fi SLAAC or secondary VIP address.
+   - `endpoint-candidates` distinguishes worker nodes (`activeWorkers`) from control-plane nodes (`controlPlaneTransit`) and fails if `tunnel.endpoints=workers` is configured on a cluster with no worker nodes.
+

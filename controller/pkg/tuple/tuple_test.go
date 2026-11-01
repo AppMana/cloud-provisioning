@@ -574,3 +574,133 @@ spec:
 		t.Fatalf("expected Windows on ARM64 ProvisionedNodeClass to fail manifests check: %+v", badRes)
 	}
 }
+
+func TestEvaluate_TailscaleAndRemoteManagementSafeguards(t *testing.T) {
+	ctx := context.Background()
+
+	links := "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536\n11: tailscale0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1280\n"
+	rulesWithCalicoOnlyV4 := "0:\tfrom all lookup local\n5210:\tfrom all fwmark 0x80000/0xff0000 lookup main\n5270:\tfrom all lookup 52\n9999:\tfrom all fwmark 0x20000/0xff0000 lookup 51\n"
+	rulesWithBypassV4 := "0:\tfrom all lookup local\n5200:\tfrom all to 100.64.0.0/10 lookup 52\n5210:\tfrom all fwmark 0x80000/0xff0000 lookup main\n5270:\tfrom all lookup 52\n9999:\tfrom all fwmark 0x20000/0xff0000 lookup 51\n"
+	rulesWithBypassV6 := "0:\tfrom all lookup local\n5200:\tfrom all to fd7a:115c:a1e0::/48 lookup 52\n5210:\tfrom all fwmark 0x80000/0xff0000 lookup main\n5270:\tfrom all lookup 52\n9999:\tfrom all fwmark 0x20000/0xff0000 lookup 51\n"
+
+	stMissing := ParseTailscaleRuleStatus(links, rulesWithCalicoOnlyV4, rulesWithCalicoOnlyV4)
+	if !stMissing.MissingV4() || !stMissing.MissingV6() {
+		t.Fatalf("expected MissingV4 and MissingV6 to be true, got: %+v", stMissing)
+	}
+	stOK := ParseTailscaleRuleStatus(links, rulesWithBypassV4, rulesWithBypassV6)
+	if stOK.MissingV4() || stOK.MissingV6() {
+		t.Fatalf("expected MissingV4 and MissingV6 to be false when priority 5200 rules are present, got: %+v", stOK)
+	}
+
+	cpNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cp-1",
+			Labels: map[string]string{
+				"node-role.kubernetes.io/control-plane": "true",
+			},
+			Annotations: map[string]string{
+				"projectcalico.org/IPv4Address": "10.19.3.10/24",
+				"projectcalico.org/IPv6Address": "fd8f:cf26:522a:0:e2fa:1dff:fe00:1234/64",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			PodCIDR:  "10.244.0.0/24",
+			PodCIDRs: []string{"10.244.0.0/24", "fd00:10:244::/112"},
+		},
+		Status: corev1.NodeStatus{
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.19.3.10"},
+				{Type: corev1.NodeInternalIP, Address: "fd8f:cf26:522a::10"},
+			},
+		},
+	}
+	calicoDS := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "calico-node", Namespace: "kube-system"},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "calico-node",
+							Env: []corev1.EnvVar{
+								{Name: "IP_AUTODETECTION_METHOD", Value: "can-reach=10.19.3.1"},
+								{Name: "IP6_AUTODETECTION_METHOD", Value: "cidr=fd8f:cf26:522a::/64"},
+							},
+						},
+					},
+				},
+			},
+		},
+		Status: appsv1.DaemonSetStatus{DesiredNumberScheduled: 1, NumberReady: 1},
+	}
+	sc := runtime.NewScheme()
+	_ = clientgoscheme.AddToScheme(sc)
+	cl := fake.NewClientBuilder().WithScheme(sc).WithObjects(cpNode, calicoDS).Build()
+
+	results, err := Evaluate(ctx, cl, CheckOptions{
+		Tuple:      "k0s + calico,bgp + aws,site",
+		ValuesYAML: []byte("tunnel:\n  endpoints: workers\n"),
+		TunnelIPv4: "100.64.10.0/24",
+		NodeTailscaleRules: map[string]TailscaleRuleStatus{
+			"cp-1": stMissing,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := byName(results)
+	if got["tailscale-routing"].EffectiveStatus() != "WARN" {
+		t.Fatalf("expected tailscale-routing to emit WARN when priority 5200 rules are missing, got: %+v", got["tailscale-routing"])
+	}
+	if got["calico-autodetection"].EffectiveStatus() != "WARN" {
+		t.Fatalf("expected calico-autodetection to emit WARN when projectcalico.org/IPv6Address differs from NodeInternalIP, got: %+v", got["calico-autodetection"])
+	}
+	if got["tunnel-ranges"].Pass {
+		t.Fatalf("expected tunnel-ranges to fail when TunnelIPv4 overlaps Tailscale 100.64.0.0/10, got: %+v", got["tunnel-ranges"])
+	}
+	if got["endpoint-candidates"].Pass {
+		t.Fatalf("expected endpoint-candidates to fail on control-plane-only cluster when tunnel.endpoints=workers, got: %+v", got["endpoint-candidates"])
+	}
+
+	// Verify that when ValuesYAML is omitted on a control-plane-only cluster, endpoint-candidates warns.
+	resultsWarn, err := Evaluate(ctx, cl, CheckOptions{
+		Tuple:      "k0s + calico,bgp + aws,site",
+		TunnelIPv4: "10.100.0.0/24",
+		NodeTailscaleRules: map[string]TailscaleRuleStatus{
+			"cp-1": stOK,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotWarn := byName(resultsWarn)
+	if !gotWarn["endpoint-candidates"].Pass || gotWarn["endpoint-candidates"].EffectiveStatus() != "WARN" {
+		t.Fatalf("expected endpoint-candidates to pass with warning on control-plane-only cluster when ValuesYAML is omitted, got: %+v", gotWarn["endpoint-candidates"])
+	}
+
+	// Now verify that with tunnel.endpoints=all, non-overlapping tunnel CIDR, and restored Tailscale rules, all checks pass.
+	resultsOK, err := Evaluate(ctx, cl, CheckOptions{
+		Tuple:      "k0s + calico,bgp + aws,site",
+		ValuesYAML: []byte("tunnel:\n  endpoints: all\n"),
+		TunnelIPv4: "10.100.0.0/24",
+		NodeTailscaleRules: map[string]TailscaleRuleStatus{
+			"cp-1": stOK,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotOK := byName(resultsOK)
+	if !gotOK["tailscale-routing"].Pass || len(gotOK["tailscale-routing"].Warnings) != 0 {
+		t.Fatalf("expected tailscale-routing to pass cleanly, got: %+v", gotOK["tailscale-routing"])
+	}
+	if !gotOK["tunnel-ranges"].Pass {
+		t.Fatalf("expected tunnel-ranges to pass, got: %+v", gotOK["tunnel-ranges"])
+	}
+	if !gotOK["endpoint-candidates"].Pass || gotOK["endpoint-candidates"].EffectiveStatus() != "PASS" {
+		t.Fatalf("expected endpoint-candidates to pass cleanly when tunnel.endpoints=all is explicitly set, got: %+v", gotOK["endpoint-candidates"])
+	}
+}

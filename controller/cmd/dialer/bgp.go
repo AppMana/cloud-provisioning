@@ -197,6 +197,9 @@ func hostRoute(addr string, med uint32) (transitRoute, error) {
 	if ip == nil {
 		return transitRoute{}, fmt.Errorf("refusing to advertise %q: not an address", addr)
 	}
+	if !ip.IsGlobalUnicast() {
+		return transitRoute{}, fmt.Errorf("refusing to advertise %q: not a global unicast address", addr)
+	}
 	length := 32
 	if ip.To4() == nil {
 		length = 128
@@ -221,6 +224,11 @@ func blockRoute(cidr string, med uint32) (transitRoute, error) {
 	}
 	if prefix.Bits() == 0 {
 		return transitRoute{}, fmt.Errorf("refusing to advertise %q: it would take every destination", cidr)
+	}
+	for _, r := range reservedNonGlobalPrefixes {
+		if prefix.Overlaps(r.prefix) {
+			return transitRoute{}, fmt.Errorf("refusing to advertise %q: overlaps reserved %s", cidr, r.label)
+		}
 	}
 	return transitRoute{prefix: prefix.Masked().String(), med: med}, nil
 }

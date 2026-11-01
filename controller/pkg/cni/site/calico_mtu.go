@@ -20,8 +20,10 @@ import (
 )
 
 var (
-	cniConfigMTUPattern = regexp.MustCompile(`("mtu"\s*:\s*)(\d+)`)
-	caliVethMTUPattern  = regexp.MustCompile(`(?m)^\d+:\s+(cali[a-zA-Z0-9_-]+)(?:@[^:\s]+)?:\s+<[^>]*>\s+mtu\s+(\d+)\b`)
+	cniConfigMTUPattern  = regexp.MustCompile(`("mtu"\s*:\s*)(\d+)`)
+	caliVethMTUPattern   = regexp.MustCompile(`(?m)^\d+:\s+(cali[a-zA-Z0-9_-]+)(?:@[^:\s]+)?:\s+<[^>]*>\s+mtu\s+(\d+)\b`)
+	tailscaleLinkPattern = regexp.MustCompile(`(?m)^\d+:\s+tailscale0(?:@[^:\s]+)?:\s+<`)
+	ipRuleLinePattern    = regexp.MustCompile(`(?m)^(\d+):\s+(.*)$`)
 )
 
 // ParseCaliVethMTUs parses `ip -o link show` output and returns a map of
@@ -39,6 +41,74 @@ func ParseCaliVethMTUs(ipLinkOutput string) map[string]int {
 	return out
 }
 
+// TailscaleRuleStatus summarizes whether a node has a Tailscale interface
+// (tailscale0) and whether its policy routing rules collide with Calico's
+// 0x80000 fwmark without priority-5200 tailnet lookup rules.
+type TailscaleRuleStatus struct {
+	HasTailscale   bool `json:"hasTailscale"`
+	HasMark5210V4  bool `json:"hasMark5210V4"`
+	HasRoute5200V4 bool `json:"hasRoute5200V4"`
+	HasMark5210V6  bool `json:"hasMark5210V6"`
+	HasRoute5200V6 bool `json:"hasRoute5200V6"`
+}
+
+// MissingV4 reports whether the node has tailscale0 and Tailscale's 0x80000
+// fwmark rule (5210) in IPv4 without a higher-priority rule steering
+// 100.64.0.0/10 to table 52.
+func (s TailscaleRuleStatus) MissingV4() bool {
+	return s.HasTailscale && s.HasMark5210V4 && !s.HasRoute5200V4
+}
+
+// MissingV6 reports whether the node has tailscale0 and Tailscale's 0x80000
+// fwmark rule (5210) in IPv6 without a higher-priority rule steering
+// fd7a:115c:a1e0::/48 to table 52.
+func (s TailscaleRuleStatus) MissingV6() bool {
+	return s.HasTailscale && s.HasMark5210V6 && !s.HasRoute5200V6
+}
+
+// ParseTailscaleRuleStatus parses `ip -o link show`, `ip -4 rule show`, and
+// `ip -6 rule show` output to detect whether Calico's 0x80000 fwmark collides
+// with Tailscale's rule 5210 without a priority-5200 override to table 52.
+func ParseTailscaleRuleStatus(ipLinkOutput, ipRule4Output, ipRule6Output string) TailscaleRuleStatus {
+	var st TailscaleRuleStatus
+	st.HasTailscale = tailscaleLinkPattern.MatchString(ipLinkOutput)
+	if !st.HasTailscale {
+		return st
+	}
+	inspectRules := func(raw, tailnetPrefix string) (hasMark5210, hasRoute5200 bool) {
+		markPrio := 5210
+		routePrios := []int{}
+		for _, m := range ipRuleLinePattern.FindAllStringSubmatch(raw, -1) {
+			if len(m) != 3 {
+				continue
+			}
+			prio, err := strconv.Atoi(m[1])
+			if err != nil {
+				continue
+			}
+			body := strings.ToLower(m[2])
+			if strings.Contains(body, "fwmark 0x80000") && strings.Contains(body, "lookup main") {
+				hasMark5210 = true
+				markPrio = prio
+			}
+			if strings.Contains(body, strings.ToLower(tailnetPrefix)) &&
+				(strings.Contains(body, "lookup 52") || strings.Contains(body, "lookup tailscale")) {
+				routePrios = append(routePrios, prio)
+			}
+		}
+		for _, rp := range routePrios {
+			if rp < markPrio {
+				hasRoute5200 = true
+				break
+			}
+		}
+		return hasMark5210, hasRoute5200
+	}
+	st.HasMark5210V4, st.HasRoute5200V4 = inspectRules(ipRule4Output, "100.64.0.0/10")
+	st.HasMark5210V6, st.HasRoute5200V6 = inspectRules(ipRule6Output, "fd7a:115c:a1e0::/48")
+	return st
+}
+
 // ReconcileReport summarizes changes applied (or planned) by ReconcileCalicoSite.
 type ReconcileReport struct {
 	EffectiveMTU          int      `json:"effectiveMTU,omitempty"`
@@ -51,6 +121,7 @@ type ReconcileReport struct {
 	GitOpsPatched         bool     `json:"gitOpsPatched,omitempty"`
 	ManifestFilesPatched  bool     `json:"manifestFilesPatched,omitempty"`
 	VethsClamped          int      `json:"vethsClamped,omitempty"`
+	TailscaleRulesFixed   int      `json:"tailscaleRulesFixed,omitempty"`
 	Changes               []string `json:"changes,omitempty"`
 }
 

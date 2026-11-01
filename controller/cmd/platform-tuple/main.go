@@ -276,6 +276,11 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 				report.VethsClamped += clamped
 				report.Changes = append(report.Changes, vethChanges...)
 			}
+			if restCfg != nil {
+				tsFixed, tsChanges := reconcileCalicoNodeTailscaleRules(ctx, cl, restCfg, *dryRun)
+				report.TailscaleRulesFixed += tsFixed
+				report.Changes = append(report.Changes, tsChanges...)
+			}
 		}
 		if len(manifestPaths) > 0 {
 			fileChanges, err := tuple.ReconcileGitOpsManifestFiles(manifestPaths, *dryRun)
@@ -373,6 +378,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	case "check":
 		var reader client.Reader
 		var nodeVethMTUs map[string]map[string]int
+		var nodeTailscaleRules map[string]tuple.TailscaleRuleStatus
 		if *kubeconfig != "" {
 			cl, restCfg, err := newKubeClient()
 			if err != nil {
@@ -382,6 +388,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 			if restCfg != nil {
 				checkCtx, checkCancel := context.WithTimeout(ctx, *timeout)
 				nodeVethMTUs = collectCalicoNodeVethMTUs(checkCtx, cl, restCfg)
+				nodeTailscaleRules = collectCalicoNodeTailscaleRules(checkCtx, cl, restCfg)
 				checkCancel()
 			}
 		}
@@ -399,6 +406,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 			RequireWindowsBGP:  *requireWindowsBGP,
 			StrictBGPPeerScope: *strictBGPPeers,
 			NodeVethMTUs:       nodeVethMTUs,
+			NodeTailscaleRules: nodeTailscaleRules,
 		})
 		if err != nil {
 			return err
@@ -518,6 +526,75 @@ func clampCalicoNodeVeths(ctx context.Context, reader client.Reader, restCfg *re
 		changes = append(changes, fmt.Sprintf("node %s (%s) clamped %d live cali* veth interface(s) to MTU %d", pod.Spec.NodeName, pod.Name, len(staleNames), targetMTU))
 	}
 	return totalClamped, changes
+}
+
+func collectCalicoNodeTailscaleRules(ctx context.Context, reader client.Reader, restCfg *rest.Config) map[string]tuple.TailscaleRuleStatus {
+	var pods corev1.PodList
+	if err := reader.List(ctx, &pods, client.InNamespace("kube-system"), client.MatchingLabels{"k8s-app": "calico-node"}); err != nil {
+		return nil
+	}
+	out := map[string]tuple.TailscaleRuleStatus{}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning || pod.Spec.NodeName == "" {
+			continue
+		}
+		links, err := execInCalicoNode(ctx, restCfg, pod.Name, []string{"ip", "-o", "link", "show"})
+		if err != nil {
+			continue
+		}
+		rulesV4, _ := execInCalicoNode(ctx, restCfg, pod.Name, []string{"ip", "-4", "rule", "show"})
+		rulesV6, _ := execInCalicoNode(ctx, restCfg, pod.Name, []string{"ip", "-6", "rule", "show"})
+		st := tuple.ParseTailscaleRuleStatus(links, rulesV4, rulesV6)
+		if st.HasTailscale {
+			out[pod.Spec.NodeName] = st
+		}
+	}
+	return out
+}
+
+func reconcileCalicoNodeTailscaleRules(ctx context.Context, reader client.Reader, restCfg *rest.Config, dryRun bool) (int, []string) {
+	var pods corev1.PodList
+	if err := reader.List(ctx, &pods, client.InNamespace("kube-system"), client.MatchingLabels{"k8s-app": "calico-node"}); err != nil {
+		return 0, nil
+	}
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Spec.NodeName < pods.Items[j].Spec.NodeName
+	})
+	var fixed int
+	var changes []string
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning || pod.Spec.NodeName == "" {
+			continue
+		}
+		links, err := execInCalicoNode(ctx, restCfg, pod.Name, []string{"ip", "-o", "link", "show"})
+		if err != nil {
+			continue
+		}
+		rulesV4, _ := execInCalicoNode(ctx, restCfg, pod.Name, []string{"ip", "-4", "rule", "show"})
+		rulesV6, _ := execInCalicoNode(ctx, restCfg, pod.Name, []string{"ip", "-6", "rule", "show"})
+		st := tuple.ParseTailscaleRuleStatus(links, rulesV4, rulesV6)
+		if !st.MissingV4() && !st.MissingV6() {
+			continue
+		}
+		var families []string
+		var cmds []string
+		if st.MissingV4() {
+			families = append(families, "IPv4 (100.64.0.0/10 lookup 52)")
+			cmds = append(cmds, "ip -4 rule add priority 5200 to 100.64.0.0/10 lookup 52 || true")
+		}
+		if st.MissingV6() {
+			families = append(families, "IPv6 (fd7a:115c:a1e0::/48 lookup 52)")
+			cmds = append(cmds, "ip -6 rule add priority 5200 to fd7a:115c:a1e0::/48 lookup 52 || true")
+		}
+		if !dryRun {
+			if _, err := execInCalicoNode(ctx, restCfg, pod.Name, []string{"sh", "-c", strings.Join(cmds, "; ")}); err != nil {
+				continue
+			}
+		}
+		fixed += len(families)
+		changes = append(changes, fmt.Sprintf("node %s (%s) installed priority 5200 Tailscale bypass rule(s) ahead of Calico fwmark: %s", pod.Spec.NodeName, pod.Name, strings.Join(families, ", ")))
+	}
+	return fixed, changes
 }
 
 func main() {

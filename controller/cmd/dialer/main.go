@@ -1632,6 +1632,8 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 			}
 		}
 	}
+	gatewayIPs := defaultGatewayIPs()
+	mgmtPrefixes := tailscaleProtectedPrefixes()
 
 	// Parse and validate the entire peer set before touching the
 	// kernel: a refused route-host (or any malformed entry) leaves the
@@ -1793,6 +1795,9 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 
 		for _, h := range p.AllRouteHosts() {
 			ipNet, err := parseHostRoute(h)
+			if err == nil {
+				err = validateProtectedDestination(ipNet, localAddrs, gatewayIPs, mgmtPrefixes)
+			}
 			if err != nil {
 				// Skipping installs strictly fewer routes, so the
 				// invariant this guard protects (never a route broader
@@ -1984,10 +1989,16 @@ func parseAllowedIP(entry string, localAddrs []net.IP, endpointHosts map[string]
 	if ones, _ := ipNet.Mask.Size(); ones == 0 {
 		return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: a default route in the accept list takes every packet", entry)
 	}
+	if err := checkNonReservedPrefix(*ipNet); err != nil {
+		return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: %w", entry, err)
+	}
 	for _, addr := range localAddrs {
 		if ipNet.Contains(addr) {
 			return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: it covers this node's own address %s", entry, addr)
 		}
+	}
+	if err := validateProtectedDestination(*ipNet, nil, defaultGatewayIPs(), tailscaleProtectedPrefixes()); err != nil {
+		return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: %w", entry, err)
 	}
 	// Without the mark, an entry covering a peer endpoint is refused:
 	// the address is reachable only outside the tunnel, and accepting
@@ -2018,6 +2029,9 @@ func parseHostRoute(h string) (net.IPNet, error) {
 	ones, bits := ipNet.Mask.Size()
 	if ones != bits {
 		return net.IPNet{}, fmt.Errorf("refusing route-host %q: kernel routes must be single hosts (/32 or /128), got /%d", h, ones)
+	}
+	if err := checkNonReservedPrefix(*ipNet); err != nil {
+		return net.IPNet{}, fmt.Errorf("refusing route-host %q: %w", h, err)
 	}
 	return *ipNet, nil
 }
@@ -2086,6 +2100,16 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 func installRoutesWithPolicy(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string, repairPolicy bool) error {
 	if err := validateReceiveRouteScope(cfg, routeHosts, claimedHosts, blocks, relay, relayDsts); err != nil {
 		return err
+	}
+	nonTunnelLocal := localNonTunnelIPs(cfg.iface)
+	gateways := defaultGatewayIPs()
+	mgmtPrefixes := tailscaleProtectedPrefixes()
+	for _, destinations := range [][]net.IPNet{routeHosts, blocks, relayDsts} {
+		for _, dst := range destinations {
+			if err := validateProtectedDestination(dst, nonTunnelLocal, gateways, mgmtPrefixes); err != nil {
+				return err
+			}
+		}
 	}
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil && !isLinkNotFound(err) {

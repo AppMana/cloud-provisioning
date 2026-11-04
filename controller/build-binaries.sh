@@ -43,7 +43,7 @@ for arch in "$@"; do
     GOOS=linux GOARCH="$arch" go build -trimpath -ldflags='-s -w' \
       -o "$output/linux/$arch/$component" "./cmd/$component"
     if [[ "$component" == endpoint-controller && ! -e "$output/linux/$arch/platform-tuple" ]]; then
-      ln -sf /endpoint-controller "$output/linux/$arch/platform-tuple"
+      ln -sf endpoint-controller "$output/linux/$arch/platform-tuple"
     fi
     if [[ "$component" == dialer ]]; then
       cp "$output/linux/$arch/dialer" "$output/wg-dialer-linux-$arch"

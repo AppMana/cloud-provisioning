@@ -1,6 +1,9 @@
 # Default values for cloud-provisioning.
 
 nameOverride: ""
+# Optional platform tuple expression (e.g. "k0s + calico,bgp + aws").
+# When set, drives default joinProvider, cloud CNI mode, and IAM bootstrap tuple.
+tuple: ""
 
 image:
   repository: ghcr.io/appmana/cloud-provisioning-endpoint-controller

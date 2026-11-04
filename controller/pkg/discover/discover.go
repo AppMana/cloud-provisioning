@@ -240,3 +240,32 @@ func ClusterDomain(ctx context.Context, c client.Client) (string, error) {
 	}
 	return "", fmt.Errorf("kube-system/coredns serves no cluster zone through its kubernetes plugin")
 }
+
+// Distro detects the cluster's Kubernetes distribution ("k0s", "k3s", "rke2",
+// "microk8s", or "kubeadm") from Node labels/versions and kube-system ConfigMaps.
+// Returns "" if the distribution cannot be unambiguously determined.
+func Distro(ctx context.Context, c client.Reader) (string, error) {
+	nodes := &corev1.NodeList{}
+	if err := c.List(ctx, nodes); err != nil {
+		return "", fmt.Errorf("listing nodes for distribution discovery: %w", err)
+	}
+	for _, n := range nodes.Items {
+		if _, ok := n.Labels["node.k0sproject.io/role"]; ok || strings.Contains(n.Status.NodeInfo.KubeletVersion, "+k0s") {
+			return "k0s", nil
+		}
+		if _, ok := n.Labels["node.kubernetes.io/microk8s-controlplane"]; ok || n.Labels["microk8s.io/cluster"] != "" {
+			return "microk8s", nil
+		}
+		if strings.Contains(n.Status.NodeInfo.KubeletVersion, "+rke2") {
+			return "rke2", nil
+		}
+		if strings.Contains(n.Status.NodeInfo.KubeletVersion, "+k3s") {
+			return "k3s", nil
+		}
+	}
+	cm := &corev1.ConfigMap{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "kubeadm-config"}, cm); err == nil {
+		return "kubeadm", nil
+	}
+	return "", nil
+}

@@ -10,7 +10,8 @@ output=$1
 target=$2
 shift 2
 case "$target" in
-  all|endpoint-controller) targets=(endpoint-controller platform-tuple dialer windows-tunnel) ;;
+  all) targets=(endpoint-controller platform-tuple dialer windows-tunnel) ;;
+  endpoint-controller) targets=(endpoint-controller dialer windows-tunnel) ;;
   dialer|platform-tuple|windows-tunnel) targets=("$target") ;;
   *) echo "unsupported target: $target" >&2; exit 2 ;;
 esac
@@ -41,6 +42,9 @@ for arch in "$@"; do
     mkdir -p "$output/linux/$arch"
     GOOS=linux GOARCH="$arch" go build -trimpath -ldflags='-s -w' \
       -o "$output/linux/$arch/$component" "./cmd/$component"
+    if [[ "$component" == endpoint-controller && ! -e "$output/linux/$arch/platform-tuple" ]]; then
+      ln -sf /endpoint-controller "$output/linux/$arch/platform-tuple"
+    fi
     if [[ "$component" == dialer ]]; then
       cp "$output/linux/$arch/dialer" "$output/wg-dialer-linux-$arch"
     fi

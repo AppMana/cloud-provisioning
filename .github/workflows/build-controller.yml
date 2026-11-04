@@ -127,26 +127,22 @@ jobs:
           DIALER_DIST: ${{ runner.temp }}/dialer-dist
         run: |
           set -euo pipefail
-          bash build-binaries.sh "$DIALER_DIST" all arm64 amd64
-          cp "$DIALER_DIST/linux/amd64/endpoint-controller" "$DIALER_DIST/endpoint-controller-linux-amd64"
-          cp "$DIALER_DIST/linux/arm64/endpoint-controller" "$DIALER_DIST/endpoint-controller-linux-arm64"
+          bash build-binaries.sh "$DIALER_DIST" dialer arm64 amd64
+          bash build-binaries.sh "$DIALER_DIST" windows-tunnel amd64
+          bash build-binaries.sh "$DIALER_DIST" platform-tuple arm64 amd64
           cp "$DIALER_DIST/linux/amd64/platform-tuple" "$DIALER_DIST/platform-tuple-linux-amd64"
           cp "$DIALER_DIST/linux/arm64/platform-tuple" "$DIALER_DIST/platform-tuple-linux-arm64"
           CGO_ENABLED=0 GOWORK=off GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o "$DIALER_DIST/platform-tuple-darwin-arm64" ./cmd/platform-tuple
           CGO_ENABLED=0 GOWORK=off GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$DIALER_DIST/platform-tuple-windows-amd64.exe" ./cmd/platform-tuple
-          CGO_ENABLED=0 GOWORK=off GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$DIALER_DIST/peer-publisher-windows-amd64.exe" ./cmd/peer-publisher
           for bin in \
             wg-dialer-linux-arm64 \
             wg-dialer-linux-amd64 \
             wg-dialer-windows-amd64.exe \
             windows-tunnel.exe \
-            endpoint-controller-linux-amd64 \
-            endpoint-controller-linux-arm64 \
             platform-tuple-linux-amd64 \
             platform-tuple-linux-arm64 \
             platform-tuple-darwin-arm64 \
-            platform-tuple-windows-amd64.exe \
-            peer-publisher-windows-amd64.exe; do
+            platform-tuple-windows-amd64.exe; do
             go version -m "$DIALER_DIST/$bin" | grep -F 'vcs.modified=false'
           done
           "$DIALER_DIST/wg-dialer-linux" --extract-native "$DIALER_DIST/.extracted-native"
@@ -157,13 +153,10 @@ jobs:
             wg-dialer-linux-amd64 \
             wg-dialer-windows-amd64.exe \
             windows-tunnel.exe \
-            endpoint-controller-linux-amd64 \
-            endpoint-controller-linux-arm64 \
             platform-tuple-linux-amd64 \
             platform-tuple-linux-arm64 \
             platform-tuple-darwin-arm64 \
             platform-tuple-windows-amd64.exe \
-            peer-publisher-windows-amd64.exe \
             manifest.json \
             dialer-manifest.json | tee SHA256SUMS)
       - name: Retain raw binaries and checksums
@@ -175,9 +168,7 @@ jobs:
             ${{ runner.temp }}/dialer-dist/wg-dialer-linux-*
             ${{ runner.temp }}/dialer-dist/wg-dialer-windows-*
             ${{ runner.temp }}/dialer-dist/windows-tunnel.exe
-            ${{ runner.temp }}/dialer-dist/endpoint-controller-*
             ${{ runner.temp }}/dialer-dist/platform-tuple-*
-            ${{ runner.temp }}/dialer-dist/peer-publisher-*
             ${{ runner.temp }}/dialer-dist/manifest.json
             ${{ runner.temp }}/dialer-dist/dialer-manifest.json
             ${{ runner.temp }}/dialer-dist/SHA256SUMS
@@ -196,13 +187,10 @@ jobs:
             "$DIALER_DIST/wg-dialer-linux-amd64"
             "$DIALER_DIST/wg-dialer-windows-amd64.exe"
             "$DIALER_DIST/windows-tunnel.exe"
-            "$DIALER_DIST/endpoint-controller-linux-amd64"
-            "$DIALER_DIST/endpoint-controller-linux-arm64"
             "$DIALER_DIST/platform-tuple-linux-amd64"
             "$DIALER_DIST/platform-tuple-linux-arm64"
             "$DIALER_DIST/platform-tuple-darwin-arm64"
             "$DIALER_DIST/platform-tuple-windows-amd64.exe"
-            "$DIALER_DIST/peer-publisher-windows-amd64.exe"
             "$DIALER_DIST/manifest.json"
             "$DIALER_DIST/dialer-manifest.json"
             "$DIALER_DIST/SHA256SUMS"

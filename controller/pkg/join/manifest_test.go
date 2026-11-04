@@ -24,13 +24,13 @@ func TestDialerManifestResolutionAndUniversalBinary(t *testing.T) {
 
 	raw := `{
   "schemaVersion": 1,
-  "version": "v0.1.22",
+  "version": "v0.1.23",
   "repository": "AppMana/cloud-provisioning",
   "universal": {
     "os": "linux",
     "architectures": ["amd64", "arm64"],
     "artifact": "wg-dialer-linux",
-    "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.22/wg-dialer-linux",
+    "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.23/wg-dialer-linux",
     "latestURL": "https://github.com/AppMana/cloud-provisioning/releases/latest/download/wg-dialer-linux",
     "sha256": "` + uniSHA + `"
   },
@@ -39,7 +39,7 @@ func TestDialerManifestResolutionAndUniversalBinary(t *testing.T) {
       "os": "linux",
       "architecture": "amd64",
       "artifact": "wg-dialer-linux-amd64",
-      "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.22/wg-dialer-linux-amd64",
+      "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.23/wg-dialer-linux-amd64",
       "latestURL": "https://github.com/AppMana/cloud-provisioning/releases/latest/download/wg-dialer-linux-amd64",
       "sha256": "` + amdSHA + `"
     },
@@ -47,7 +47,7 @@ func TestDialerManifestResolutionAndUniversalBinary(t *testing.T) {
       "os": "linux",
       "architecture": "arm64",
       "artifact": "wg-dialer-linux-arm64",
-      "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.22/wg-dialer-linux-arm64",
+      "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.23/wg-dialer-linux-arm64",
       "latestURL": "https://github.com/AppMana/cloud-provisioning/releases/latest/download/wg-dialer-linux-arm64",
       "sha256": "` + armSHA + `"
     },
@@ -55,7 +55,7 @@ func TestDialerManifestResolutionAndUniversalBinary(t *testing.T) {
       "os": "windows",
       "architecture": "amd64",
       "artifact": "windows-tunnel.exe",
-      "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.22/windows-tunnel.exe",
+      "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.23/windows-tunnel.exe",
       "latestURL": "https://github.com/AppMana/cloud-provisioning/releases/latest/download/windows-tunnel.exe",
       "sha256": "` + winSHA + `"
     }
@@ -100,12 +100,12 @@ func TestReconcile_ResolvesDialerBinariesFromManifestWithoutManualSHAs(t *testin
 	uniSHA := strings.Repeat("e", 64)
 	manifestJSON := `{
   "schemaVersion": 1,
-  "version": "v0.1.22",
+  "version": "v0.1.23",
   "universal": {
     "os": "linux",
     "architectures": ["amd64", "arm64"],
     "artifact": "wg-dialer-linux",
-    "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.22/wg-dialer-linux",
+    "url": "https://github.com/AppMana/cloud-provisioning/releases/download/v0.1.23/wg-dialer-linux",
     "latestURL": "https://github.com/AppMana/cloud-provisioning/releases/latest/download/wg-dialer-linux",
     "sha256": "` + uniSHA + `"
   }

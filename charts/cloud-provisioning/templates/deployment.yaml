@@ -117,6 +117,9 @@ spec:
           {{- end }}
           {{- end }}
           args:
+            {{- with .Values.tuple }}
+            - {{ printf "--tuple=%s" . | quote }}
+            {{- end }}
             - "--aws-vpc-cni-family={{ .Values.platforms.aws.vpcCNI.family }}"
             {{- with .Values.artifactRegion }}
             - "--artifact-region={{ . }}"

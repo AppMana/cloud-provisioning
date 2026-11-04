@@ -11,7 +11,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v5
@@ -21,6 +21,8 @@ jobs:
       - name: Log in to GHCR
         run: helm registry login ghcr.io -u ${{ github.actor }} --password-stdin <<< "${{ secrets.GITHUB_TOKEN }}"
       - name: Package and push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           helm repo add cluster-api-operator https://kubernetes-sigs.github.io/cluster-api-operator
@@ -31,3 +33,6 @@ jobs:
           test -n "$base_version"
           helm package charts/cloud-provisioning --version "$base_version" --app-version "$base_version" --destination dist/chart
           helm push dist/chart/cloud-provisioning-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts
+          if gh release view "v${base_version}" >/dev/null 2>&1; then
+            gh release upload "v${base_version}" --clobber dist/chart/cloud-provisioning-*.tgz
+          fi

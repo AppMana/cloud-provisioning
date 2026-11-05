@@ -169,5 +169,25 @@ class ReceiptTLS(unittest.TestCase):
         self.assertIn("cert-manager", result.stderr)
 
 
+class MultiCAPIAndStructuredEndpoints(unittest.TestCase):
+    def test_multi_capi_target_configs_and_provider_namespaces(self):
+        result = subprocess.run([
+            "helm", "template", "multi-capi", "charts/cloud-provisioning",
+            "--set-json", 'targetConfigs=["aws,aws-vpc","gcp,site"]',
+            "--set-json", 'providerManagerNamespaces=["capa-system","capg-system"]',
+            "--set-json", 'tunnel.endpoints={"matchLabels":{"rack":"edge"},"nodeNames":["appmana-002"]}',
+        ], cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"--target-config=aws,aws-vpc;gcp,site"', result.stdout)
+        self.assertIn('\\"nodeNames\\":[\\"appmana-002\\"]', result.stdout)
+        docs = [d for d in yaml.safe_load_all(result.stdout) if d]
+        cred_roles = [
+            d["metadata"]["namespace"]
+            for d in docs
+            if d["kind"] == "Role" and d["metadata"]["name"].endswith("-read-provider-credentials")
+        ]
+        self.assertEqual(cred_roles, ["capa-system", "capg-system"])
+
+
 if __name__ == "__main__":
     unittest.main()

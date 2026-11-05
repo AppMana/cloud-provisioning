@@ -107,7 +107,10 @@ func Run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	fs.BoolVar(&winOpts.Offline, "offline", false, "set ImagePullPolicy=Never")
 
 	mode := fs.String("mode", "check", "check, fix, iam-render, iam-apply, iam-cleanup, render, k0s-network, or validate-k0s-config")
-	tupleExpr := fs.String("tuple", "k0s + calico,bgp + aws", "platform tuple expression (e.g. \"k0s + calico,bgp + aws\")")
+	tupleExpr := new(string)
+	*tupleExpr = "k0s + calico,bgp + aws"
+	fs.StringVar(tupleExpr, "target-config", *tupleExpr, "target config expression (e.g. \"aws,aws-vpc;gcp,site\" or \"k0s + calico,bgp + aws\")")
+	fs.StringVar(tupleExpr, "tuple", *tupleExpr, "platform tuple / target config expression (alias for --target-config)")
 	k0sConfigPath := fs.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
 	valuesPath := fs.String("values", "", "optional Helm values.yaml path to inspect for cloud-provisioning configuration")
 	var manifestPaths []string

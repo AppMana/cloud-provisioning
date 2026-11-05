@@ -42,6 +42,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
+	joingcp "github.com/appmana/cloud-provisioning/controller/pkg/join/gcp"
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
 	joink3s "github.com/appmana/cloud-provisioning/controller/pkg/join/k3s"
 	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
@@ -136,6 +137,7 @@ type meshReconciler struct {
 	// Tunnel-endpoint placement: which local nodes terminate tunnels.
 	// Empty selector = every Linux worker. Control-plane nodes are
 	// excluded unless explicitly selected.
+	tunnelEndpointFilter   *TunnelEndpointSelector
 	tunnelEndpointSelector labels.Selector
 	tunnelEndpointsRaw     string
 	siteDialerSelector     labels.Selector
@@ -277,7 +279,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		if err != nil {
 			return
 		}
-		result, err = r.finishRetiredReceiveAdoptions(ctx, result)
+		result, err = r.receiveCoordinator().FinishRetiredAdoptions(ctx, result)
 	}()
 
 	// Node events enqueue a nameless request because they change the endpoint
@@ -285,7 +287,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// endpoint changes do not necessarily produce a Machine event.
 	if req.Name == "" {
 		result := ctrl.Result{}
-		if r.receivePreparation != nil {
+		if r.receiveCoordinator().Active() {
 			result.RequeueAfter = 30 * time.Second
 		}
 		return result, r.refreshAdoptionConfigs(ctx)
@@ -461,7 +463,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
 	}
-	if remoteBlocksPending || observedNative || r.receivePreparation != nil {
+	if remoteBlocksPending || observedNative || r.receiveCoordinator().Active() {
 		// Come back for the blocks this node has not been given yet.
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -668,7 +670,8 @@ func main() {
 	windowsIPAMPullSecrets := flag.String("aws-windows-ipam-pull-secrets", "", "comma-separated kube-system Secrets for pulling the Windows IPAM image")
 	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
-	platformTuple := flag.String("tuple", "", "optional platform tuple expression (e.g. 'k0s + calico,bgp + aws') driving default join provider and cloud CNI")
+	targetConfigFlag := flag.String("target-config", "", "optional target config expression (e.g. 'aws,aws-vpc;gcp,site' or 'k0s + calico,bgp + aws') driving default join provider and cloud CNI")
+	platformTuple := flag.String("tuple", "", "alias for --target-config (e.g. 'k0s + calico,bgp + aws')")
 	awsIAMBootstrap := flag.Bool("aws-iam-bootstrap", false, "reconcile AWS IAM policies, roles, and instance profile at startup using current AWS credentials")
 	awsIAMScope := flag.String("aws-iam-scope", "account", "IAM scope when --aws-iam-bootstrap is enabled: 'account' (shared clusterawsadm roles + AWS-Managed Policies) or 'cluster'")
 	awsIAMTuple := flag.String("aws-iam-tuple", "k0s + calico,bgp + aws", "platform tuple expression used when --aws-iam-bootstrap is enabled")
@@ -679,20 +682,31 @@ func main() {
 	flag.Visit(func(f *flag.Flag) {
 		explicitFlags[f.Name] = true
 	})
-	if strings.TrimSpace(*platformTuple) != "" {
-		parsedTuple, err := tuple.Parse(*platformTuple)
+	rawTargetConfig := strings.TrimSpace(*targetConfigFlag)
+	if rawTargetConfig == "" {
+		rawTargetConfig = strings.TrimSpace(*platformTuple)
+	}
+	if rawTargetConfig != "" {
+		clusterCfg, err := tuple.ParseClusterTargetConfig(rawTargetConfig)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "invalid --tuple: %v\n", err)
+			fmt.Fprintf(os.Stderr, "invalid --target-config/--tuple: %v\n", err)
 			os.Exit(2)
 		}
-		if !explicitFlags["join-provider"] {
-			joinProviderName = parsedTuple.Distribution
+		if !explicitFlags["join-provider"] && clusterCfg.Site.Distribution != "" {
+			joinProviderName = clusterCfg.Site.Distribution
 		}
-		if !explicitFlags["aws-iam-tuple"] {
-			*awsIAMTuple = parsedTuple.String()
-		}
-		if !explicitFlags["aws-vpc-cni"] && parsedTuple.Provider == "aws" {
-			*vpcCNI = parsedTuple.CloudCNI == "aws-vpc"
+		if awsTarget, ok := clusterCfg.TargetForProvider("aws"); ok {
+			if !explicitFlags["aws-iam-tuple"] {
+				for _, t := range clusterCfg.Tuples() {
+					if t.Provider == "aws" {
+						*awsIAMTuple = t.String()
+						break
+					}
+				}
+			}
+			if !explicitFlags["aws-vpc-cni"] {
+				*vpcCNI = awsTarget.CloudCNI == "aws-vpc"
+			}
 		}
 	}
 	receivePolicy, policyErr := parseReceivePreparationPolicy(*receivePolicyJSON, wireGuardListenPort)
@@ -728,13 +742,7 @@ func main() {
 		os.Exit(1)
 	}
 	rawTunnelEndpoints := tunnelEndpoints
-	if isAllNodes(tunnelEndpoints) {
-		// Not a label selector, so it must not be parsed as one; the
-		// reconciler still sees the original, which is what tells it
-		// control planes are wanted.
-		tunnelEndpoints = ""
-	}
-	endpointSelector, err := labels.Parse(tunnelEndpoints)
+	endpointFilter, endpointSelector, err := parseTunnelEndpointSelector(tunnelEndpoints)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --tunnel-endpoints: %v\n", err)
 		os.Exit(1)
@@ -900,13 +908,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "aws-iam-bootstrap: reconciled %d changes for cluster %s (%s)\n", len(report.Changes), report.ClusterName, report.AccountID)
 	}
 	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName, EC2: awsSDK.API, WindowsIPAM: *vpcCNI && *windowsIPAMImage != ""}
+	gcpProvider := joingcp.Provider{}
 	dockerProvider := joindocker.Provider{}
 	// Adopts a container someone else owns, which is how a lab topology
 	// presents a machine. Shipped like the docker provider rather than
 	// hidden behind a build tag, so a harness exercises the same binary
 	// that is released.
 	labcontainersProvider := joinlabcontainers.Provider{}
-	infraProviders := []join.InfraProvider{awsProvider, dockerProvider, labcontainersProvider}
+	infraProviders := []join.InfraProvider{awsProvider, gcpProvider, dockerProvider, labcontainersProvider}
 
 	excluder, err := siteExcluder(mgr.GetClient(), mgr.GetAPIReader(), infraProviders, *siteCNIDaemonSets)
 	if err != nil {
@@ -937,6 +946,7 @@ func main() {
 		port:                   port,
 		gatewayNamespace:       gatewayNamespace,
 		gatewayName:            gatewayName,
+		tunnelEndpointFilter:   endpointFilter,
 		tunnelEndpointSelector: endpointSelector,
 		tunnelEndpointsRaw:     rawTunnelEndpoints,
 		siteDialerSelector:     siteDialerSelector,
@@ -1185,7 +1195,7 @@ func main() {
 				MeshName:                  secretName,
 				RetirementMaxAge:          claimRetirementAge,
 				Reader:                    mgr.GetAPIReader(),
-				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider, labcontainersProvider},
+				Provisioners:              []join.MachineProvisioner{awsProvider, gcpProvider, dockerProvider, labcontainersProvider},
 				RoleLabel:                 cloudWorkerRoleLabel,
 				RoleValue:                 cloudWorkerRoleValue,
 				BootstrapSecretNameFormat: bootstrapSecretNameFormat,

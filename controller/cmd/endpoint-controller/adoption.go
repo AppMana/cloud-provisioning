@@ -68,7 +68,7 @@ func (r *meshReconciler) refreshAdoptionConfigs(ctx context.Context) error {
 			ctrl.LoggerFrom(ctx).Error(err, "could not re-assert a remote's CNI address", "machine", machines.Items[i].GetName())
 			// Existing published intent still needs expiry recovery when normal
 			// CNI work fails. Never start preparation through this error path.
-			if recoveryErr := r.recoverPublishedReceiveTransition(ctx, &machines.Items[i], time.Now()); recoveryErr != nil {
+			if recoveryErr := r.receiveCoordinator().RecoverPublishedTransition(ctx, &machines.Items[i], time.Now()); recoveryErr != nil {
 				ctrl.LoggerFrom(ctx).Error(recoveryErr, "could not recover a remote's published handover", "machine", machines.Items[i].GetName())
 			}
 			continue
@@ -551,26 +551,8 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 	if err != nil {
 		return fmt.Errorf("getting adoption secret %s/%s: %w", r.secretNamespace, name, err)
 	}
-	if r.receivePreparation != nil {
-		if !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
-			return nil
-		}
-		_, preparing := existing.Data[tunnel.ReceivePrepareKey]
-		if !preparing && remoteNeighborSourcesWithdrawn(existing.Data[tunnel.CloudPeersKey], doc) {
-			hasJournal, err := r.hasReceiveJournal(ctx, machine)
-			if err != nil {
-				return err
-			}
-			if !hasJournal {
-				patch := client.MergeFromWithOptions(existing.DeepCopy(), client.MergeFromWithOptimisticLock{})
-				if existing.Data == nil {
-					existing.Data = map[string][]byte{}
-				}
-				existing.Data[tunnel.CloudPeersKey] = doc
-				return r.Patch(ctx, existing, patch)
-			}
-		}
-		return r.reconcileReceivePreparation(ctx, machine)
+	if handled, err := r.receiveCoordinator().ReconcileAdoption(ctx, machine, existing, doc); handled {
+		return err
 	}
 	if string(existing.Data[tunnel.CloudPeersKey]) == string(doc) {
 		return nil
@@ -630,75 +612,14 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 		return fmt.Errorf("listing machines to scope the dialer Role: %w", err)
 	}
 	adoption := make([]string, 0, len(machines.Items))
-	journals := make([]string, 0, len(machines.Items))
 	for i := range machines.Items {
 		adoption = append(adoption, tunnel.AdoptionSecretName(machines.Items[i].GetName()))
-		if r.receivePreparation != nil && r.receivePreparation.Journal != nil && machines.Items[i].GetNamespace() == r.secretNamespace {
-			if machines.Items[i].GetUID() == "" {
-				return fmt.Errorf("journal read access requires a machine UID")
-			}
-			journals = append(journals, tunnel.ReceiveTransitionName(string(machines.Items[i].GetUID())))
-		}
 	}
-	if r.receivePreparation != nil && r.receivePreparation.Journal != nil {
-		mesh := &corev1.Secret{}
-		if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
-			return err
-		}
-		if mesh.UID == "" || mesh.DeletionTimestamp != nil {
-			return fmt.Errorf("journal read access requires a live mesh identity")
-		}
-		inventory, _, err := tunnel.ReadReceiveInventory(ctx, r.receiveJournal.ConfigMaps, r.receiveJournal.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		journals = append(journals, tunnel.ReceiveInventoryName(string(mesh.UID)))
-		// Released histories still fence stale boot recovery. Keep their exact
-		// journal and ancestry reads without treating them as active owners.
-		retained := append([]string{}, inventory.MachineUIDs...)
-		for uid := range inventory.Released {
-			retained = append(retained, uid)
-		}
-		sort.Strings(retained)
-		for _, uid := range retained {
-			name := tunnel.ReceiveTransitionName(uid)
-			publication, released := inventory.Released[uid]
-			if !released {
-				publication = inventory.Publications[uid]
-			}
-			if publication.JournalUID != "" {
-				store := r.receiveJournal
-				store.Name, store.ExpectedUID = name, publication.JournalUID
-				snapshot, err := store.Load(ctx)
-				if err != nil {
-					return err
-				}
-				archives, err := store.ArchiveNames(ctx, snapshot)
-				if err != nil {
-					return err
-				}
-				journals = append(journals, archives...)
-				if !released {
-					pending, err := r.receivePreparationArchive(ctx, store, snapshot)
-					if err != nil {
-						return err
-					}
-					if pending != "" {
-						journals = append(journals, pending)
-					}
-				}
-			}
-			found := false
-			for _, current := range journals {
-				found = found || current == name
-			}
-			if !found {
-				journals = append(journals, name)
-			}
-		}
+	journals, needPodsGet, err := r.receiveCoordinator().JournalRoleResources(ctx, machines.Items)
+	if err != nil {
+		return err
 	}
 	sort.Strings(adoption)
-	sort.Strings(journals)
 	desired := []rbacv1.PolicyRule{{
 		APIGroups:     []string{""},
 		Resources:     []string{"secrets"},
@@ -710,7 +631,7 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 		// separate controller-owned journals that agents may only read by name.
 		desired = append(desired, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: journals})
 	}
-	if r.receivePreparation != nil && r.receivePreparation.Journal != nil && r.receivePreparation.Journal.Receipts != nil && r.receivePreparation.Journal.Receipts.Endpoint != "" {
+	if needPodsGet {
 		desired = append(desired, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}})
 	}
 

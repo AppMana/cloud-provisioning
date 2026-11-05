@@ -155,9 +155,9 @@ func (t Tuple) Validate() error {
 		return fmt.Errorf("unsupported site CNI %q (supported: calico, cilium, flannel)", t.CNI)
 	}
 	switch t.Provider {
-	case "aws", "docker", "labcontainers":
+	case "aws", "gcp", "docker", "labcontainers":
 	default:
-		return fmt.Errorf("unsupported cloud provider %q (supported: aws, docker, labcontainers)", t.Provider)
+		return fmt.Errorf("unsupported cloud provider %q (supported: aws, gcp, docker, labcontainers)", t.Provider)
 	}
 	switch t.GuestOS {
 	case "", "linux", "windows", "mixed":

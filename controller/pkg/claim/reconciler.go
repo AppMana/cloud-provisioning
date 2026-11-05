@@ -456,7 +456,9 @@ func (r *Reconciler) fail(ctx context.Context, claim *v1alpha1.ProvisionedNodeCl
 
 // resolveCluster finds the CAPI Cluster the claim joins:
 // spec.clusterName when set, otherwise the single Cluster in the
-// claim's namespace (ambiguity is an error, not a guess).
+// claim's namespace (or the single Cluster whose infrastructure provider
+// matches the claim's machine template kind when multiple CAPI providers
+// share a namespace; ambiguity within the same provider is an error, not a guess).
 func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim) (*unstructured.Unstructured, error) {
 	if claim.Spec.ClusterName != "" {
 		cluster := &unstructured.Unstructured{}
@@ -477,8 +479,39 @@ func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.Provisi
 	case 0:
 		return nil, fmt.Errorf("no CAPI Cluster in namespace %s (create one, or set spec.clusterName)", claim.Namespace)
 	default:
+		if matched := r.matchingClustersForTemplate(list.Items, claim.Spec.InfrastructureRef.Kind); len(matched) == 1 {
+			return matched[0], nil
+		}
 		return nil, fmt.Errorf("%d CAPI Clusters in namespace %s: set spec.clusterName", len(list.Items), claim.Namespace)
 	}
+}
+
+// matchingClustersForTemplate filters candidate Clusters to those whose
+// spec.infrastructureRef.kind belongs to the provisioner for templateKind
+// (e.g. AWSMachineTemplate -> AWSMachine -> AWSCluster, GCPMachineTemplate -> GCPMachine -> GCPCluster).
+func (r *Reconciler) matchingClustersForTemplate(clusters []unstructured.Unstructured, templateKind string) []*unstructured.Unstructured {
+	machineKind := strings.TrimSuffix(templateKind, "Template")
+	if machineKind == "" || machineKind == templateKind {
+		return nil
+	}
+	var wantClusterKind string
+	for _, p := range r.Provisioners {
+		if p.GVK().Kind == machineKind {
+			wantClusterKind = p.ClusterGVK().Kind
+			break
+		}
+	}
+	if wantClusterKind == "" {
+		return nil
+	}
+	var matched []*unstructured.Unstructured
+	for i := range clusters {
+		infraKind, _, _ := unstructured.NestedString(clusters[i].Object, "spec", "infrastructureRef", "kind")
+		if infraKind == wantClusterKind {
+			matched = append(matched, &clusters[i])
+		}
+	}
+	return matched
 }
 
 const managedByAnnotation = "cluster.x-k8s.io/managed-by"

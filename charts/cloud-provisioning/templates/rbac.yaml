@@ -72,10 +72,10 @@ rules:
     resources: ["clusters/status"]
     verbs: ["get", "patch"]
   # Provider machine objects: read (join reconciler waits on
-  # existence), create (claim reconciler). CAPA cluster/identity
+  # existence), create (claim reconciler). CAPA/CAPG cluster/identity
   # objects: read-only preflight (aws.Provider.Validate).
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
-    resources: ["awsmachines", "dockermachines"]
+    resources: ["awsmachines", "gcpmachines", "dockermachines"]
     verbs: ["get", "create", "delete"]
   # Read across the whole infrastructure group. A claim names its
   # machine template by apiGroup and kind, and the machine created is
@@ -87,7 +87,7 @@ rules:
     verbs: ["get", "list", "watch"]
   # Same reason as clusters/status above.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
-    resources: ["awsclusters/status", "dockerclusters/status"]
+    resources: ["awsclusters/status", "gcpclusters/status", "dockerclusters/status"]
     verbs: ["get", "patch"]
   # A machine kind this operator adopts rather than creates, for a lab
   # topology that owns its own containers. The wildcard covers the
@@ -496,23 +496,36 @@ subjects:
     name: {{ include "cloud-provisioning.name" . }}
     namespace: {{ .Release.Namespace }}
 ---
-{{- if .Values.providerManagerNamespace }}
-{{- /* Only when the AWS provider is configured: this Role lives in
-CAPA's manager namespace, which does not exist in a cluster that
-installs a different infrastructure provider, and rendering it
-unconditionally makes the chart uninstallable there.
+{{- $providerNamespaces := list -}}
+{{- if .Values.providerManagerNamespace -}}
+{{- $providerNamespaces = append $providerNamespaces .Values.providerManagerNamespace -}}
+{{- end -}}
+{{- range .Values.providerManagerNamespaces -}}
+{{- if . -}}
+{{- $providerNamespaces = append $providerNamespaces . -}}
+{{- end -}}
+{{- end -}}
+{{- $providerNamespaces = uniq $providerNamespaces -}}
+{{- range $idx, $ns := $providerNamespaces }}
+{{- if gt $idx 0 }}
+---
+{{- end }}
+{{- /* Only when an infrastructure provider namespace is configured: this Role
+lives in the provider's manager namespace (e.g. capa-system, capg-system),
+which does not exist in a cluster that installs a different infrastructure
+provider, and rendering it unconditionally makes the chart uninstallable there.
 
 The AWS provider's preflight check (aws.Provider.Validate) resolves an
 AWSClusterStaticIdentity's secretRef against CAPA's own manager
 namespace, which is where CAPA looks regardless of where the
 AWSCluster lives. Without read access there the check cannot verify
 the credential and errors out instead of passing, which blocks every
-bootstrap render. Read-only, one namespace. */}}
+bootstrap render. Read-only, per configured provider manager namespace. */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "cloud-provisioning.controllerName" . }}-read-provider-credentials
-  namespace: {{ .Values.providerManagerNamespace }}
+  name: {{ include "cloud-provisioning.controllerName" $ }}-read-provider-credentials
+  namespace: {{ $ns }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -521,14 +534,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "cloud-provisioning.controllerName" . }}-read-provider-credentials
-  namespace: {{ .Values.providerManagerNamespace }}
+  name: {{ include "cloud-provisioning.controllerName" $ }}-read-provider-credentials
+  namespace: {{ $ns }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "cloud-provisioning.controllerName" . }}-read-provider-credentials
+  name: {{ include "cloud-provisioning.controllerName" $ }}-read-provider-credentials
 subjects:
   - kind: ServiceAccount
-    name: {{ include "cloud-provisioning.controllerName" . }}
-    namespace: {{ .Release.Namespace }}
+    name: {{ include "cloud-provisioning.controllerName" $ }}
+    namespace: {{ $.Release.Namespace }}
 {{- end }}

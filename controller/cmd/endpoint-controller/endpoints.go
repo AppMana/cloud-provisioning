@@ -55,7 +55,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			return 0, fmt.Errorf("creating peer secret %s: %w", secretKey, err)
 		}
 	}
-	if progressed, err := r.reconcileOrphanReceiveWithdrawals(ctx, secret); err != nil {
+	if progressed, err := r.receiveCoordinator().ReconcileOrphanWithdrawals(ctx, secret); err != nil {
 		return 0, err
 	} else if progressed {
 		return time.Second, nil
@@ -290,6 +290,179 @@ func soonestRelease(data map[string][]byte, now time.Time, retention time.Durati
 	return soonest
 }
 
+// TunnelEndpointSelector is a structured selector for choosing which site Linux
+// nodes terminate WireGuard tunnels. It supports standard metav1.LabelSelector
+// (matchLabels + matchExpressions), explicit nodeNames / excludeNodeNames,
+// role filters ("worker", "control-plane", "all"), and node field requirements
+// (metadata.name, spec.unschedulable), while remaining backward-compatible with
+// plain label-selector strings and "all".
+type TunnelEndpointSelector struct {
+	MatchLabels         map[string]string                `json:"matchLabels,omitempty"`
+	MatchExpressions    []metav1.LabelSelectorRequirement `json:"matchExpressions,omitempty"`
+	NodeNames           []string                         `json:"nodeNames,omitempty"`
+	ExcludeNodeNames    []string                         `json:"excludeNodeNames,omitempty"`
+	Roles               []string                         `json:"roles,omitempty"`
+	IncludeControlPlane bool                             `json:"includeControlPlane,omitempty"`
+	MatchFields         []corev1.NodeSelectorRequirement `json:"matchFields,omitempty"`
+
+	compiledSelector labels.Selector
+}
+
+// parseTunnelEndpointSelector parses either a legacy label-selector string
+// ("", "all", "*", or "k=v,k2 in (a,b)") or a JSON-encoded TunnelEndpointSelector.
+func parseTunnelEndpointSelector(raw string) (*TunnelEndpointSelector, labels.Selector, error) {
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasPrefix(trimmed, "{") {
+		var spec TunnelEndpointSelector
+		dec := json.NewDecoder(strings.NewReader(trimmed))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&spec); err != nil {
+			return nil, nil, fmt.Errorf("parsing structured tunnel.endpoints selector: %w", err)
+		}
+		ls := &metav1.LabelSelector{
+			MatchLabels:      spec.MatchLabels,
+			MatchExpressions: spec.MatchExpressions,
+		}
+		sel, err := metav1.LabelSelectorAsSelector(ls)
+		if err != nil {
+			return nil, nil, fmt.Errorf("compiling tunnel.endpoints label selector: %w", err)
+		}
+		for _, r := range spec.Roles {
+			switch strings.ToLower(strings.TrimSpace(r)) {
+			case "worker", "workers", "control-plane", "controlplane", "master", "all", "*":
+			default:
+				return nil, nil, fmt.Errorf("unknown role %q in tunnel.endpoints.roles (supported: worker, control-plane, all)", r)
+			}
+		}
+		for _, mf := range spec.MatchFields {
+			switch mf.Key {
+			case "metadata.name", "spec.unschedulable":
+			default:
+				return nil, nil, fmt.Errorf("unsupported matchFields key %q in tunnel.endpoints (supported: metadata.name, spec.unschedulable)", mf.Key)
+			}
+			switch mf.Operator {
+			case corev1.NodeSelectorOpIn, corev1.NodeSelectorOpNotIn:
+				if len(mf.Values) == 0 {
+					return nil, nil, fmt.Errorf("matchFields key %q with operator %s requires non-empty values", mf.Key, mf.Operator)
+				}
+			default:
+				return nil, nil, fmt.Errorf("unsupported matchFields operator %q in tunnel.endpoints (supported: In, NotIn)", mf.Operator)
+			}
+		}
+		spec.compiledSelector = sel
+		return &spec, sel, nil
+	}
+	if isAllNodes(trimmed) {
+		return nil, labels.Everything(), nil
+	}
+	sel, err := labels.Parse(trimmed)
+	if err != nil {
+		return nil, nil, err
+	}
+	return nil, sel, nil
+}
+
+func (s *TunnelEndpointSelector) namesControlPlane() bool {
+	if s == nil {
+		return false
+	}
+	if s.IncludeControlPlane {
+		return true
+	}
+	for _, r := range s.Roles {
+		switch strings.ToLower(strings.TrimSpace(r)) {
+		case "control-plane", "controlplane", "master", "all", "*":
+			return true
+		}
+	}
+	for k := range s.MatchLabels {
+		if _, ok := platform.ControlPlaneMarks[k]; ok {
+			return true
+		}
+	}
+	for _, expr := range s.MatchExpressions {
+		if _, ok := platform.ControlPlaneMarks[expr.Key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *TunnelEndpointSelector) allowsWorkers() bool {
+	if s == nil || len(s.Roles) == 0 {
+		return true
+	}
+	for _, r := range s.Roles {
+		switch strings.ToLower(strings.TrimSpace(r)) {
+		case "worker", "workers", "all", "*":
+			return true
+		}
+	}
+	return false
+}
+
+func (s *TunnelEndpointSelector) matchesNode(node *corev1.Node) bool {
+	for _, ex := range s.ExcludeNodeNames {
+		if strings.TrimSpace(ex) == node.Name {
+			return false
+		}
+	}
+	if len(s.NodeNames) > 0 {
+		matchedName := false
+		for _, n := range s.NodeNames {
+			if strings.TrimSpace(n) == node.Name {
+				matchedName = true
+				break
+			}
+		}
+		if !matchedName {
+			return false
+		}
+	}
+	isCP := platform.IsControlPlane(node)
+	// Explicit nodeNames select that node even if it is a control-plane node,
+	// unless roles explicitly exclude control-plane.
+	namedExplicitly := len(s.NodeNames) > 0
+	if isCP && !s.namesControlPlane() && !(namedExplicitly && len(s.Roles) == 0) {
+		return false
+	}
+	if !isCP && !s.allowsWorkers() {
+		return false
+	}
+	for _, mf := range s.MatchFields {
+		var actual string
+		switch mf.Key {
+		case "metadata.name":
+			actual = node.Name
+		case "spec.unschedulable":
+			if node.Spec.Unschedulable {
+				actual = "true"
+			} else {
+				actual = "false"
+			}
+		}
+		inValues := false
+		for _, v := range mf.Values {
+			if v == actual {
+				inValues = true
+				break
+			}
+		}
+		if mf.Operator == corev1.NodeSelectorOpIn && !inValues {
+			return false
+		}
+		if mf.Operator == corev1.NodeSelectorOpNotIn && inValues {
+			return false
+		}
+	}
+	if s.compiledSelector != nil && !s.compiledSelector.Empty() {
+		if !s.compiledSelector.Matches(labels.Set(node.Labels)) {
+			return false
+		}
+	}
+	return true
+}
+
 // isTunnelEndpoint reports whether a node should terminate tunnels:
 // Linux, and matching the tunnelEndpoints selector. Control-plane
 // nodes are excluded unless the selector names them explicitly, so by
@@ -307,6 +480,14 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 	// cluster, and an empty selector means the same.
 	if node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue {
 		return false
+	}
+	if r.tunnelEndpointFilter != nil {
+		return r.tunnelEndpointFilter.matchesNode(node)
+	}
+	if strings.HasPrefix(strings.TrimSpace(r.tunnelEndpointsRaw), "{") {
+		if filter, _, err := parseTunnelEndpointSelector(r.tunnelEndpointsRaw); err == nil && filter != nil {
+			return filter.matchesNode(node)
+		}
 	}
 	if platform.IsControlPlane(node) && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
 		return false

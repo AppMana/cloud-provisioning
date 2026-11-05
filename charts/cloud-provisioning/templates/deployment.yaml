@@ -117,8 +117,9 @@ spec:
           {{- end }}
           {{- end }}
           args:
-            {{- with .Values.tuple }}
-            - {{ printf "--tuple=%s" . | quote }}
+            {{- $targetCfg := .Values.targetConfig | default (join ";" .Values.targetConfigs) | default .Values.tuple }}
+            {{- with $targetCfg }}
+            - {{ printf "--target-config=%s" . | quote }}
             {{- end }}
             - "--aws-vpc-cni-family={{ .Values.platforms.aws.vpcCNI.family }}"
             {{- with .Values.artifactRegion }}
@@ -183,7 +184,11 @@ spec:
             - "--join-api-address={{ . }}"
             {{- end }}
             {{- with .Values.tunnel.endpoints }}
+            {{- if kindIs "string" . }}
             - "--tunnel-endpoints={{ . }}"
+            {{- else }}
+            - {{ printf "--tunnel-endpoints=%s" (toJson .) | quote }}
+            {{- end }}
             {{- end }}
             {{- with .Values.tunnel.endpointRetention }}
             - "--tunnel-endpoint-retention={{ . }}"

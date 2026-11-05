@@ -1,8 +1,13 @@
 # Default values for cloud-provisioning.
 
 nameOverride: ""
-# Optional platform tuple expression (e.g. "k0s + calico,bgp + aws").
-# When set, drives default joinProvider, cloud CNI mode, and IAM bootstrap tuple.
+# Optional target configuration expression (e.g. "aws,aws-vpc;gcp,site" or
+# "k0s + calico,bgp + aws") or list of target configs (targetConfigs).
+# Site distribution and site CNI are auto-detected from the cluster at startup;
+# targetConfig / targetConfigs drive per-provider CNI defaults and IAM bootstrap.
+targetConfig: ""
+targetConfigs: []
+# Backward-compatible alias for targetConfig.
 tuple: ""
 
 image:
@@ -100,12 +105,19 @@ tunnel:
   # installed); cert-manager renews it, and the controller serves a renewed
   # certificate without restarting.
   receiptTLSSecret: ""
-  # Node selector (k=v,k2=v2) choosing which local nodes terminate
-  # tunnels. Empty selects every Linux worker; control planes are
-  # excluded unless the selector names the role label the distribution
-  # puts on them (node-role.kubernetes.io/control-plane, or
-  # node.k0sproject.io/role=control-plane on k0s, or
-  # node.kubernetes.io/microk8s-controlplane on MicroK8s), or is "all".
+  # Selector choosing which local site Linux nodes terminate WireGuard tunnels.
+  # Accepts either:
+  #   - a label-selector string ("k=v,k2 in (a,b)", "" for all Linux workers, or "all"), OR
+  #   - a structured selector object:
+  #       matchLabels: {k: v}
+  #       matchExpressions: [{key: k, operator: In, values: [v1, v2]}]
+  #       nodeNames: ["node-1", "node-2"]
+  #       excludeNodeNames: ["node-3"]
+  #       roles: ["worker"]            # "worker", "control-plane", "all"
+  #       includeControlPlane: false
+  #       matchFields: [{key: metadata.name, operator: In, values: ["node-1"]}]
+  # Empty selects every Linux worker; control planes are excluded unless
+  # selected via includeControlPlane/roles/nodeNames/role-label or "all".
   # Only the selected nodes get a cldt* interface.
   endpoints: ""
 
@@ -171,10 +183,12 @@ importedControlPlane:
   # namespace: capa-system}]. CAPI core reads it through aggregation.
   providerServiceAccounts: []
 
-# The namespace an infrastructure provider's controller runs in, when
-# this controller needs to read a credentials Secret there to check a
-# cluster identity before provisioning. Empty grants no such access.
-providerManagerNamespace: ""   # e.g. capa-system
+# The namespace(s) infrastructure provider controllers run in (e.g.
+# ["capa-system", "capg-system"] when running AWS and GCP CAPI providers in
+# the same cluster), when this controller needs to read a credentials Secret
+# there to check a cluster identity before provisioning. Empty grants no such access.
+providerManagerNamespace: ""    # e.g. capa-system
+providerManagerNamespaces: []   # e.g. ["capa-system", "capg-system"]
 
 # Cluster-level configuration for the docker provider, which fulfills a
 # claim as a local container and is how the end to end harness

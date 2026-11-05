@@ -195,16 +195,37 @@ func Evaluate(ctx context.Context, c client.Reader, opts CheckOptions) ([]CheckR
 	}
 
 	var out []CheckResult
-	parsedTuple, err := Parse(tupleStr)
-	if err != nil {
-		out = append(out, CheckResult{Name: "tuple", Pass: false, Detail: err.Error()})
-		return normalizeResults(out), nil
+	var parsedTuple Tuple
+	if strings.Contains(tupleStr, ";") || !strings.Contains(tupleStr, "+") {
+		clusterCfg, err := ParseClusterTargetConfig(tupleStr)
+		if err != nil {
+			out = append(out, CheckResult{Name: "tuple", Pass: false, Detail: err.Error()})
+			return normalizeResults(out), nil
+		}
+		tuples := clusterCfg.Tuples()
+		parsedTuple = tuples[0]
+		var summary []string
+		for _, t := range tuples {
+			summary = append(summary, fmt.Sprintf("%s (os=%s cloudCNI=%s)", t, t.GuestOS, t.CloudCNI))
+		}
+		out = append(out, CheckResult{
+			Name:   "tuple",
+			Pass:   true,
+			Detail: strings.Join(summary, "; "),
+		})
+	} else {
+		var err error
+		parsedTuple, err = Parse(tupleStr)
+		if err != nil {
+			out = append(out, CheckResult{Name: "tuple", Pass: false, Detail: err.Error()})
+			return normalizeResults(out), nil
+		}
+		out = append(out, CheckResult{
+			Name:   "tuple",
+			Pass:   true,
+			Detail: fmt.Sprintf("%s (os=%s cloudCNI=%s)", parsedTuple, parsedTuple.GuestOS, parsedTuple.CloudCNI),
+		})
 	}
-	out = append(out, CheckResult{
-		Name:   "tuple",
-		Pass:   true,
-		Detail: fmt.Sprintf("%s (os=%s cloudCNI=%s)", parsedTuple, parsedTuple.GuestOS, parsedTuple.CloudCNI),
-	})
 
 	if len(opts.K0sConfig) > 0 {
 		warnings, err := InspectK0sCalicoConfig(opts.K0sConfig, parsedTuple, opts.TunnelMTU)

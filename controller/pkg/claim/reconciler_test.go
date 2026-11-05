@@ -13,6 +13,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
+	joingcp "github.com/appmana/cloud-provisioning/controller/pkg/join/gcp"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +48,7 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(clusterListGVK, &unstructured.UnstructuredList{})
 	awsMachineGVK := joinaws.Provider{}.GVK()
-	for _, kind := range []string{"AWSMachine", "AWSMachineTemplate", "AWSCluster", "DockerMachine", "DockerMachineTemplate"} {
+	for _, kind := range []string{"AWSMachine", "AWSMachineTemplate", "AWSCluster", "GCPMachine", "GCPMachineTemplate", "GCPCluster", "DockerMachine", "DockerMachineTemplate"} {
 		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind), &unstructured.Unstructured{})
 		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
 	}
@@ -812,5 +813,55 @@ func TestReconcile_VPCCNIMachinesNeedGroupsThatAdmitEachOther(t *testing.T) {
 	got := &v1alpha1.ProvisionedNodeClaim{}
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), got); err != nil || got.Status.Phase != "Failed" || !strings.Contains(got.Status.Message, "sg-000000000000000cd") {
 		t.Fatalf("status = %+v, %v", got.Status, err)
+	}
+}
+
+func TestReconcile_MultiCAPI_AWSAndGCPInSameNamespace(t *testing.T) {
+	awsClaim := fakeClaim("aws-worker")
+	gcpClaim := &v1alpha1.ProvisionedNodeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "gcp-worker", Namespace: "default", UID: "claim-gcp-1"},
+		Spec: v1alpha1.ProvisionedNodeClaimSpec{
+			InfrastructureRef: corev1.TypedLocalObjectReference{APIGroup: &infraGroup, Kind: "GCPMachineTemplate", Name: "gcp-worker"},
+		},
+	}
+	gcpTemplate := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "GCPMachineTemplate",
+		"metadata":   map[string]any{"name": "gcp-worker", "namespace": "default"},
+		"spec": map[string]any{
+			"template": map[string]any{
+				"spec": map[string]any{"instanceType": "e2-standard-4"},
+			},
+		},
+	}}
+	gcpCluster := fakeCluster("appmana-gcp")
+	_ = unstructured.SetNestedField(gcpCluster.Object, "GCPCluster", "spec", "infrastructureRef", "kind")
+
+	r := newClaimReconciler(t, awsClaim, gcpClaim, fakeTemplate("aws-worker"), gcpTemplate, fakeCluster("appmana-aws"), gcpCluster, awsConfigSecret(), fakeNode())
+	r.Provisioners = append(r.Provisioners, joingcp.Provider{})
+
+	if err := reconcileClaim(t, r, awsClaim); err != nil {
+		t.Fatalf("reconciling AWS claim in multi-CAPI namespace: %v", err)
+	}
+	if err := reconcileClaim(t, r, gcpClaim); err != nil {
+		t.Fatalf("reconciling GCP claim in multi-CAPI namespace: %v", err)
+	}
+
+	awsMachine := &unstructured.Unstructured{}
+	awsMachine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "aws-worker"}, awsMachine); err != nil {
+		t.Fatalf("expected aws-worker Machine: %v", err)
+	}
+	if got, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "clusterName"); got != "appmana-aws" {
+		t.Fatalf("aws-worker clusterName = %q, want appmana-aws", got)
+	}
+
+	gcpMachine := &unstructured.Unstructured{}
+	gcpMachine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "gcp-worker"}, gcpMachine); err != nil {
+		t.Fatalf("expected gcp-worker Machine: %v", err)
+	}
+	if got, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "clusterName"); got != "appmana-gcp" {
+		t.Fatalf("gcp-worker clusterName = %q, want appmana-gcp", got)
 	}
 }

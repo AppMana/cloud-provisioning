@@ -1041,3 +1041,62 @@ func TestAnUnacknowledgedRemoteHoldsTheRelease(t *testing.T) {
 		t.Fatal("cp was released with no acknowledgment from any remote")
 	}
 }
+
+func TestStructuredTunnelEndpointSelector(t *testing.T) {
+	raw := `{
+		"matchLabels": {"rack": "edge"},
+		"matchExpressions": [{"key": "zone", "operator": "In", "values": ["a", "b"]}],
+		"nodeNames": ["node-1", "node-2", "cp-1"],
+		"excludeNodeNames": ["node-2"],
+		"includeControlPlane": true,
+		"matchFields": [{"key": "spec.unschedulable", "operator": "NotIn", "values": ["true"]}]
+	}`
+	filter, sel, err := parseTunnelEndpointSelector(raw)
+	if err != nil {
+		t.Fatalf("parseTunnelEndpointSelector: %v", err)
+	}
+	r := &meshReconciler{
+		tunnelEndpointFilter:   filter,
+		tunnelEndpointSelector: sel,
+		tunnelEndpointsRaw:     raw,
+	}
+
+	node1 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "node-1",
+			Labels: map[string]string{"kubernetes.io/os": "linux", "rack": "edge", "zone": "a"},
+		},
+	}
+	node2Excluded := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "node-2",
+			Labels: map[string]string{"kubernetes.io/os": "linux", "rack": "edge", "zone": "a"},
+		},
+	}
+	cp1 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "cp-1",
+			Labels: map[string]string{"kubernetes.io/os": "linux", "node-role.kubernetes.io/control-plane": "", "rack": "edge", "zone": "b"},
+		},
+	}
+	unsched := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "node-1",
+			Labels: map[string]string{"kubernetes.io/os": "linux", "rack": "edge", "zone": "a"},
+		},
+		Spec: corev1.NodeSpec{Unschedulable: true},
+	}
+
+	if !r.isTunnelEndpoint(node1) {
+		t.Fatal("expected node-1 to match structured tunnel endpoint selector")
+	}
+	if r.isTunnelEndpoint(node2Excluded) {
+		t.Fatal("expected node-2 to be excluded by excludeNodeNames")
+	}
+	if !r.isTunnelEndpoint(cp1) {
+		t.Fatal("expected cp-1 to match when includeControlPlane=true")
+	}
+	if r.isTunnelEndpoint(unsched) {
+		t.Fatal("expected unschedulable node to be excluded by matchFields")
+	}
+}

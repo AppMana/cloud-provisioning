@@ -25,6 +25,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	"sigs.k8s.io/yaml"
 )
 
 // Namespace is where the product lives.
@@ -184,6 +185,34 @@ func (p *Product) LoadOnto(ctx context.Context, nodes []string) error {
 	return nil
 }
 
+// ExampleHelmReleasePath is the path to the reference HelmRelease manifest
+// in examples/ used as the base values for integration tests.
+const ExampleHelmReleasePath = "examples/helm-release.yaml"
+
+// ExampleValuesPath is where the extracted HelmRelease spec.values are staged on the bastion.
+const ExampleValuesPath = rig.LabDir + "/example-values.yaml"
+
+// ExampleHelmReleaseValues extracts spec.values from a Flux HelmRelease YAML
+// document (such as examples/helm-release.yaml) so integration tests install
+// the chart using the same HelmRelease values shown in the README/examples.
+func ExampleHelmReleaseValues(manifest []byte) ([]byte, error) {
+	for _, doc := range strings.Split(string(manifest), "\n---") {
+		var obj struct {
+			Kind string `json:"kind"`
+			Spec struct {
+				Values map[string]any `json:"values"`
+			} `json:"spec"`
+		}
+		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
+			return nil, err
+		}
+		if obj.Kind == "HelmRelease" && obj.Spec.Values != nil {
+			return yaml.Marshal(obj.Spec.Values)
+		}
+	}
+	return nil, fmt.Errorf("no HelmRelease with spec.values found in manifest")
+}
+
 // Install runs helm from the bastion.
 //
 // From the bastion because this host cannot reach the API server and
@@ -200,23 +229,36 @@ func (p *Product) Install(ctx context.Context, opts Options, dialerSHA string) e
 		return err
 	}
 
-	// The real values an operator sets, and nothing else. imagePullPolicy
-	// is Never because the site has no registry; the rest is what the
-	// row varies.
 	args := []string{
 		"upgrade", "--install", "cloud-provisioning", ChartPath,
 		"--namespace", Namespace, "--create-namespace", "--wait", "--timeout", "6m",
-		"--set", "image.repository=" + strings.Split(p.controllerRef(), ":")[0],
-		"--set", "image.tag=" + strings.Split(p.controllerRef(), ":")[1],
+	}
+	if rawExample, err := os.ReadFile(filepath.Join(p.RepoDir, ExampleHelmReleasePath)); err == nil {
+		valuesYAML, err := ExampleHelmReleaseValues(rawExample)
+		if err != nil {
+			return fmt.Errorf("parsing %s: %w", ExampleHelmReleasePath, err)
+		}
+		if err := p.Kube.Bastion.Put(ctx, bytes.NewReader(valuesYAML), ExampleValuesPath, 0o644); err != nil {
+			return fmt.Errorf("staging example values: %w", err)
+		}
+		args = append(args, "-f", ExampleValuesPath)
+	}
+
+	// The real values an operator sets, and nothing else. imagePullPolicy
+	// is Never because the site has no registry; the rest is what the
+	// row varies.
+	args = append(args,
+		"--set", "image.repository="+strings.Split(p.controllerRef(), ":")[0],
+		"--set", "image.tag="+strings.Split(p.controllerRef(), ":")[1],
 		"--set", "image.pullPolicy=Never",
 		"--set", "dialerImage.pullPolicy=Never",
-		"--set", "dialerImage.repository=" + strings.Split(p.dialerRef(), ":")[0],
-		"--set", "dialerImage.tag=" + strings.Split(p.dialerRef(), ":")[1],
-		"--set-string", "tunnel.endpoints=" + escapeHelmValue(opts.TunnelEndpoints),
-		"--set", "joinProvider=" + opts.JoinProvider,
-		"--set", "dialerBinary.amd64.url=" + opts.DialerURL,
-		"--set", "dialerBinary.amd64.sha256=" + dialerSHA,
-	}
+		"--set", "dialerImage.repository="+strings.Split(p.dialerRef(), ":")[0],
+		"--set", "dialerImage.tag="+strings.Split(p.dialerRef(), ":")[1],
+		"--set-string", "tunnel.endpoints="+escapeHelmValue(opts.TunnelEndpoints),
+		"--set", "joinProvider="+opts.JoinProvider,
+		"--set", "dialerBinary.amd64.url="+opts.DialerURL,
+		"--set", "dialerBinary.amd64.sha256="+dialerSHA,
+	)
 	out, err := p.Kube.Helm(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("installing the chart: %w: %s", err, out)

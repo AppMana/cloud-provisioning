@@ -11,6 +11,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,6 +67,25 @@ type MachineProvisioner interface {
 	// it to route a claim to the provider that owns the CAPI Cluster's
 	// infrastructure.
 	ClusterGVK() schema.GroupVersionKind
+}
+
+// DynamicInfraProvider is an optional capability an InfraProvider implements
+// when it acts as a generic CAPI fallback for any standard Cluster API
+// infrastructure Machine kind (e.g. AzureMachine, OpenStackMachine,
+// HetznerBareMetalMachine, VSphereMachine) without a dedicated provider.
+type DynamicInfraProvider interface {
+	InfraProvider
+	MatchesMachineKind(group, kind string) bool
+	BindMachineGVK(gvk schema.GroupVersionKind) InfraProvider
+}
+
+// DynamicMachineProvisioner is an optional capability a MachineProvisioner
+// implements when it acts as a generic CAPI fallback for any standard
+// Cluster API infrastructure Cluster and MachineTemplate pair.
+type DynamicMachineProvisioner interface {
+	MachineProvisioner
+	MatchesClusterKind(group, clusterKind, templateKind string) bool
+	BindClusterAndTemplate(mapper apimeta.RESTMapper, clusterGroup, clusterKind, templateGroup, templateKind string) MachineProvisioner
 }
 
 // Validator is an optional capability an InfraProvider may implement:

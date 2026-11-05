@@ -101,3 +101,48 @@ func TestStageChartRequiresLockBeforeCreatingArtifacts(t *testing.T) {
 		t.Fatal("created artifacts without lock")
 	}
 }
+
+func TestExampleHelmReleasesRenderWithChart(t *testing.T) {
+	if _, err := exec.LookPath("helm"); err != nil {
+		t.Skip("native Helm required")
+	}
+	repoRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	chartDir := filepath.Join(repoRoot, "charts", "cloud-provisioning")
+
+	for _, tc := range []struct {
+		file       string
+		wantSubstr string
+	}{
+		{
+			file:       "examples/helm-release.yaml",
+			wantSubstr: "--tunnel-endpoints=all",
+		},
+		{
+			file:       "examples/helm-release-gateways.yaml",
+			wantSubstr: `--tunnel-endpoints={\"matchLabels\":{\"tunnel-gateway\":\"true\"}}`,
+		},
+	} {
+		raw, err := os.ReadFile(filepath.Join(repoRoot, tc.file))
+		if err != nil {
+			t.Fatalf("reading %s: %v", tc.file, err)
+		}
+		valuesYAML, err := ExampleHelmReleaseValues(raw)
+		if err != nil {
+			t.Fatalf("extracting spec.values from %s: %v", tc.file, err)
+		}
+		valFile := filepath.Join(t.TempDir(), "values.yaml")
+		if err := os.WriteFile(valFile, valuesYAML, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command("helm", "template", "cloud-provisioning", chartDir, "-f", valFile).CombinedOutput()
+		if err != nil {
+			t.Fatalf("helm template with %s failed: %v\n%s", tc.file, err, out)
+		}
+		if !strings.Contains(string(out), tc.wantSubstr) {
+			t.Fatalf("rendered chart for %s did not contain %q", tc.file, tc.wantSubstr)
+		}
+	}
+}

@@ -420,10 +420,11 @@ func (s *TunnelEndpointSelector) matchesNode(node *corev1.Node) bool {
 		}
 	}
 	isCP := platform.IsControlPlane(node)
-	// Explicit nodeNames select that node even if it is a control-plane node,
-	// unless roles explicitly exclude control-plane.
-	namedExplicitly := len(s.NodeNames) > 0
-	if isCP && !s.namesControlPlane() && !(namedExplicitly && len(s.Roles) == 0) {
+	// When roles are not restricted (len(s.Roles) == 0), any on-premises Linux
+	// node matching the structured selector (nodeNames, matchLabels,
+	// matchExpressions, or matchFields) is eligible, including control-plane
+	// nodes. To restrict to workers only, set roles: ["worker"].
+	if isCP && len(s.Roles) > 0 && !s.namesControlPlane() {
 		return false
 	}
 	if !isCP && !s.allowsWorkers() {
@@ -489,13 +490,11 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 			return filter.matchesNode(node)
 		}
 	}
-	if platform.IsControlPlane(node) && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
+	hasExplicitLabelSelector := r.tunnelEndpointSelector != nil && !r.tunnelEndpointSelector.Empty() && !isExplicitAllNodes(r.tunnelEndpointsRaw)
+	if platform.IsControlPlane(node) && hasExplicitLabelSelector && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
 		return false
 	}
-	if isAllNodes(r.tunnelEndpointsRaw) {
-		return true
-	}
-	if r.tunnelEndpointSelector == nil || r.tunnelEndpointSelector.Empty() {
+	if !hasExplicitLabelSelector {
 		return true
 	}
 	return r.tunnelEndpointSelector.Matches(labels.Set(node.Labels))
@@ -846,11 +845,17 @@ func selectorNamesControlPlane(raw string) bool {
 	return isAllNodes(raw)
 }
 
-// isAllNodes is the one selector a label selector cannot express: every
-// node, control planes included. A control plane is left out unless it
-// is named, and naming it in a selector that also matches workers is
-// not something label syntax allows.
+// isAllNodes selects every on-premises Linux node (control-plane and worker
+// nodes alike) when tunnel.endpoints is empty, "all", or "*". Remote cloud
+// workers always run the tunnel regardless of this selector.
 func isAllNodes(raw string) bool {
+	if strings.TrimSpace(raw) == "" {
+		return true
+	}
+	return isExplicitAllNodes(raw)
+}
+
+func isExplicitAllNodes(raw string) bool {
 	switch strings.TrimSpace(raw) {
 	case "all", "*":
 		return true

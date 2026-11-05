@@ -225,7 +225,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		log.V(1).Info("machine's infrastructureRef has no kind yet, waiting")
 		return ctrl.Result{}, nil
 	}
-	infra := r.infraProviderFor(infraRefKind)
+	infraRefGroup, _, _ := unstructured.NestedString(machine.Object, "spec", "infrastructureRef", "apiGroup")
+	infra := r.infraProviderForRef(infraRefGroup, infraRefKind)
 	if infra == nil {
 		return ctrl.Result{}, fmt.Errorf("no InfraProvider registered for infrastructureRef kind %q", infraRefKind)
 	}
@@ -578,17 +579,36 @@ func defaultCNI(infra InfraProvider) func(string) string {
 }
 
 // infraProviderFor finds the registered InfraProvider whose GVK.Kind
-// matches a Machine's spec.infrastructureRef.kind, or nil if none is
-// registered for it. The match is a Kind comparison and nothing more
-// specific, so registering a new InfraProvider is all that is needed
-// to support a new infrastructure.
+// matches a Machine's spec.infrastructureRef.kind, or falls back to a
+// registered DynamicInfraProvider (e.g. generic CAPI).
 func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
+	return r.infraProviderForRef("", kind)
+}
+
+func (r *Reconciler) infraProviderForRef(group, kind string) InfraProvider {
 	for _, p := range r.InfraProviders {
 		if p.GVK().Kind == kind {
 			return p
 		}
 	}
+	for _, p := range r.InfraProviders {
+		if dyn, ok := p.(DynamicInfraProvider); ok && dyn.MatchesMachineKind(group, kind) {
+			return dyn.BindMachineGVK(r.resolveInfraGVK(group, kind))
+		}
+	}
 	return nil
+}
+
+func (r *Reconciler) resolveInfraGVK(group, kind string) schema.GroupVersionKind {
+	if group == "" {
+		group = "infrastructure.cluster.x-k8s.io"
+	}
+	if r.Client != nil && r.Client.RESTMapper() != nil {
+		if mapping, err := r.Client.RESTMapper().RESTMapping(schema.GroupKind{Group: group, Kind: kind}); err == nil && mapping.GroupVersionKind.Version != "" {
+			return mapping.GroupVersionKind
+		}
+	}
+	return schema.GroupVersionKind{Group: group, Version: "v1beta2", Kind: kind}
 }
 
 // ResolveDialerBinaries populates missing per-arch dialer binary URLs and SHA256

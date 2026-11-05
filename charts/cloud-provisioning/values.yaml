@@ -105,21 +105,23 @@ tunnel:
   # installed); cert-manager renews it, and the controller serves a renewed
   # certificate without restarting.
   receiptTLSSecret: ""
-  # Selector choosing which local site Linux nodes terminate WireGuard tunnels.
+  # Selector choosing which on-premises Linux nodes terminate WireGuard tunnels.
+  # Remote cloud workers ALWAYS run the tunnel (via tunnel-dialer-remote on Linux
+  # or windows-tunnel.exe on Windows); they can never be omitted by this setting.
+  #
   # Accepts either:
-  #   - a label-selector string ("k=v,k2 in (a,b)", "" for all Linux workers, or "all"), OR
+  #   - "all" (default, or ""): full mesh — every on-premises Linux node
+  #     (including control-plane nodes) + all remote cloud nodes.
+  #   - a label-selector string ("tunnel-gateway=true,zone in (a,b)"), OR
   #   - a structured selector object:
-  #       matchLabels: {k: v}
-  #       matchExpressions: [{key: k, operator: In, values: [v1, v2]}]
-  #       nodeNames: ["node-1", "node-2"]
+  #       matchLabels: {tunnel-gateway: "true"}
+  #       matchExpressions: [{key: zone, operator: In, values: [a, b]}]
+  #       nodeNames: ["gateway-1", "gateway-2"]
   #       excludeNodeNames: ["node-3"]
   #       roles: ["worker"]            # "worker", "control-plane", "all"
-  #       includeControlPlane: false
-  #       matchFields: [{key: metadata.name, operator: In, values: ["node-1"]}]
-  # Empty selects every Linux worker; control planes are excluded unless
-  # selected via includeControlPlane/roles/nodeNames/role-label or "all".
-  # Only the selected nodes get a cldt* interface.
-  endpoints: ""
+  #       includeControlPlane: true
+  #       matchFields: [{key: metadata.name, operator: In, values: ["gateway-1"]}]
+  endpoints: "all"
 
   # How long a node that has left the selector goes on being an
   # endpoint: its dialer stays scheduled, its entries stay published,

@@ -1,0 +1,177 @@
+# Mixed Remote Clusters & Multi-Machine Provisioning (AWS + GCP + Generic CAPI / Azure)
+#
+# Multiple Cluster API infrastructure providers can coexist in the same namespace.
+# Each ProvisionedNodeClaim references its provider's MachineTemplate, and the
+# controller automatically matches it to the corresponding CAPI Cluster
+# (AWSMachineTemplate -> AWSCluster, GCPMachineTemplate -> GCPCluster,
+# AzureMachineTemplate -> AzureCluster).
+# To provision more machines, apply additional ProvisionedNodeClaims referencing
+# any template.
+
+# --- 1. AWS CAPI Cluster & MachineTemplate (CAPA) ---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSCluster
+metadata:
+  name: site-aws
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  region: us-west-2
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: site-aws
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSCluster
+    name: site-aws
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: aws-ubuntu-amd64
+  namespace: cloud-provisioning
+spec:
+  template:
+    metadata:
+      labels:
+        cloud-provisioning.appmana.com/os: linux
+        cloud-provisioning.appmana.com/arch: amd64
+        cloud-provisioning.appmana.com/cni: site
+    spec:
+      instanceType: t3.large
+      ami:
+        id: ami-0abcdef1234567890
+      subnet:
+        id: subnet-0123456789abcdef0
+      publicIP: true
+---
+# Provision two AWS workers from the same AWSMachineTemplate:
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: aws-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachineTemplate
+    name: aws-ubuntu-amd64
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: aws-worker-2
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachineTemplate
+    name: aws-ubuntu-amd64
+---
+# --- 2. Google Cloud CAPI Cluster & MachineTemplate (CAPG) ---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: GCPCluster
+metadata:
+  name: site-gcp
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  project: my-gcp-project
+  region: us-central1
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: site-gcp
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: GCPCluster
+    name: site-gcp
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: GCPMachineTemplate
+metadata:
+  name: gcp-ubuntu-amd64
+  namespace: cloud-provisioning
+spec:
+  template:
+    metadata:
+      labels:
+        cloud-provisioning.appmana.com/os: linux
+        cloud-provisioning.appmana.com/arch: amd64
+    spec:
+      instanceType: e2-standard-4
+      image: projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64
+      publicIP: true
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: gcp-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: GCPMachineTemplate
+    name: gcp-ubuntu-amd64
+---
+# --- 3. Generic CAPI Provider Example (CAPZ AzureCluster & AzureMachineTemplate) ---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AzureCluster
+metadata:
+  name: site-azure
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  location: westus2
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: site-azure
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AzureCluster
+    name: site-azure
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AzureMachineTemplate
+metadata:
+  name: azure-ubuntu-amd64
+  namespace: cloud-provisioning
+spec:
+  template:
+    metadata:
+      labels:
+        cloud-provisioning.appmana.com/os: linux
+        cloud-provisioning.appmana.com/arch: amd64
+    spec:
+      vmSize: Standard_D4s_v5
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: azure-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AzureMachineTemplate
+    name: azure-ubuntu-amd64

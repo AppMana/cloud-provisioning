@@ -154,7 +154,8 @@ spec:
             - "--dialer-daemonset-name={{ include "cloud-provisioning.name" . }}-dialer"
             - "--dialer-cloud-daemonset-name={{ include "cloud-provisioning.name" . }}-dialer-remote"
             - "--aws-config-namespace={{ .Release.Namespace }}"
-            {{- with .Values.transit.bgpPort }}
+            {{- $bgpPort := .Values.transit.bgpPort | default .Values.tunnel.transitBGPPort }}
+            {{- with $bgpPort }}
             - "--transit-bgp-port={{ . }}"
             - "--transit-bgp-asn={{ $.Values.transit.bgpASN }}"
             {{- end }}

@@ -1,0 +1,32 @@
+# Default HelmRelease: Full-Mesh WireGuard Tunnel (every on-premises node + all remote cloud nodes)
+#
+# Remote cloud workers ALWAYS run the WireGuard tunnel (they can never be omitted).
+# By default, tunnel.endpoints is "all", which places the tunnel on every on-premises
+# Linux node (both control-plane and worker nodes) as well.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: cloud-provisioning
+  namespace: cloud-provisioning
+spec:
+  interval: 10m
+  url: oci://ghcr.io/appmana/charts/cloud-provisioning
+  ref:
+    tag: 0.1.23
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloud-provisioning
+  namespace: cloud-provisioning
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: cloud-provisioning
+  values:
+    joinProvider: k0s
+    tunnel:
+      # "all" (the default) places the tunnel on every on-premises Linux node
+      # alongside all remote cloud workers (full mesh).
+      endpoints: "all"

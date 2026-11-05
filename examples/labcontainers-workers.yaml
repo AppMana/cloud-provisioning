@@ -1,0 +1,67 @@
+# Labcontainers Integration Manifest: Provisioning Multiple Remote Workers
+#
+# Used by the labcontainers integration harness (harness/e2e/claim) to provision
+# remote1 and remote2 over the simulated WAN.
+apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabCluster
+metadata:
+  name: cldt
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec: {}
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: cldt
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabCluster
+    name: cldt
+---
+apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabMachineTemplate
+metadata:
+  name: remote1
+  namespace: cloud-provisioning
+spec:
+  template:
+    spec:
+      nodeName: remote1
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: remote1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabMachineTemplate
+    name: remote1
+  clusterName: cldt
+---
+apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabMachineTemplate
+metadata:
+  name: remote2
+  namespace: cloud-provisioning
+spec:
+  template:
+    spec:
+      nodeName: remote2
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: remote2
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabMachineTemplate
+    name: remote2
+  clusterName: cldt

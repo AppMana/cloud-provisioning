@@ -124,7 +124,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return r.fail(ctx, claim, err)
 	}
 	infraKind, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "kind")
-	provisioner := r.provisionerForClusterKind(infraKind)
+	provisioner := r.provisionerForCluster(cluster, claim)
 	if provisioner == nil {
 		return r.fail(ctx, claim, fmt.Errorf("no registered provider fulfills clusters of infrastructure kind %q", infraKind))
 	}
@@ -327,19 +327,20 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 
 	// Only clean up orphaned provider objects after the Machine is absent,
 	// including a partial creation that never produced a Machine.
-	for _, p := range r.Provisioners {
+	candidateGVKs := r.teardownCandidateGVKs(claim)
+	for _, gvk := range candidateGVKs {
 		infraMachine := &unstructured.Unstructured{}
-		infraMachine.SetGroupVersionKind(p.GVK())
+		infraMachine.SetGroupVersionKind(gvk)
 		switch err := r.Reader.Get(ctx, key, infraMachine); {
 		case err == nil:
 			remaining++
 			if infraMachine.GetDeletionTimestamp().IsZero() {
 				if err := r.deleteObserved(ctx, infraMachine); err != nil && !apierrors.IsNotFound(err) {
-					return ctrl.Result{}, fmt.Errorf("deleting %s %s: %w", p.GVK().Kind, key, err)
+					return ctrl.Result{}, fmt.Errorf("deleting %s %s: %w", gvk.Kind, key, err)
 				}
 			}
 		case !apierrors.IsNotFound(err) && !isMissingKind(err):
-			return ctrl.Result{}, fmt.Errorf("checking %s during teardown: %w", p.GVK().Kind, err)
+			return ctrl.Result{}, fmt.Errorf("checking %s during teardown: %w", gvk.Kind, err)
 		}
 	}
 
@@ -488,7 +489,8 @@ func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.Provisi
 
 // matchingClustersForTemplate filters candidate Clusters to those whose
 // spec.infrastructureRef.kind belongs to the provisioner for templateKind
-// (e.g. AWSMachineTemplate -> AWSMachine -> AWSCluster, GCPMachineTemplate -> GCPMachine -> GCPCluster).
+// (e.g. AWSMachineTemplate -> AWSMachine -> AWSCluster, GCPMachineTemplate -> GCPMachine -> GCPCluster,
+// AzureMachineTemplate -> AzureMachine -> AzureCluster).
 func (r *Reconciler) matchingClustersForTemplate(clusters []unstructured.Unstructured, templateKind string) []*unstructured.Unstructured {
 	machineKind := strings.TrimSuffix(templateKind, "Template")
 	if machineKind == "" || machineKind == templateKind {
@@ -499,6 +501,21 @@ func (r *Reconciler) matchingClustersForTemplate(clusters []unstructured.Unstruc
 		if p.GVK().Kind == machineKind {
 			wantClusterKind = p.ClusterGVK().Kind
 			break
+		}
+	}
+	if wantClusterKind == "" {
+		for _, p := range r.Provisioners {
+			if dyn, ok := p.(join.DynamicMachineProvisioner); ok {
+				var mapper apimeta.RESTMapper
+				if r.Client != nil {
+					mapper = r.Client.RESTMapper()
+				}
+				bound := dyn.BindClusterAndTemplate(mapper, "", "", "", templateKind)
+				if bound != nil && bound.ClusterGVK().Kind != "" && bound.ClusterGVK().Kind != "GenericCluster" {
+					wantClusterKind = bound.ClusterGVK().Kind
+					break
+				}
+			}
 		}
 	}
 	if wantClusterKind == "" {
@@ -612,6 +629,59 @@ func (r *Reconciler) provisionerForClusterKind(kind string) join.MachineProvisio
 		}
 	}
 	return nil
+}
+
+func (r *Reconciler) provisionerForCluster(cluster *unstructured.Unstructured, claim *v1alpha1.ProvisionedNodeClaim) join.MachineProvisioner {
+	infraKind, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "kind")
+	if p := r.provisionerForClusterKind(infraKind); p != nil {
+		return p
+	}
+	infraGroup, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "apiGroup")
+	var templateKind, templateGroup string
+	if claim != nil {
+		templateKind = claim.Spec.InfrastructureRef.Kind
+		if claim.Spec.InfrastructureRef.APIGroup != nil {
+			templateGroup = *claim.Spec.InfrastructureRef.APIGroup
+		}
+	}
+	var mapper apimeta.RESTMapper
+	if r.Client != nil {
+		mapper = r.Client.RESTMapper()
+	}
+	for _, p := range r.Provisioners {
+		if dyn, ok := p.(join.DynamicMachineProvisioner); ok && dyn.MatchesClusterKind(infraGroup, infraKind, templateKind) {
+			return dyn.BindClusterAndTemplate(mapper, infraGroup, infraKind, templateGroup, templateKind)
+		}
+	}
+	return nil
+}
+
+func (r *Reconciler) teardownCandidateGVKs(claim *v1alpha1.ProvisionedNodeClaim) []schema.GroupVersionKind {
+	seen := map[schema.GroupVersionKind]bool{}
+	var out []schema.GroupVersionKind
+	add := func(gvk schema.GroupVersionKind) {
+		if gvk.Kind == "" || gvk.Kind == "GenericMachine" || seen[gvk] {
+			return
+		}
+		seen[gvk] = true
+		out = append(out, gvk)
+	}
+	for _, p := range r.Provisioners {
+		add(p.GVK())
+	}
+	if claim != nil && strings.HasSuffix(claim.Spec.InfrastructureRef.Kind, "Template") {
+		group := "infrastructure.cluster.x-k8s.io"
+		if claim.Spec.InfrastructureRef.APIGroup != nil && *claim.Spec.InfrastructureRef.APIGroup != "" {
+			group = *claim.Spec.InfrastructureRef.APIGroup
+		}
+		machineKind := strings.TrimSuffix(claim.Spec.InfrastructureRef.Kind, "Template")
+		if r.Client != nil && r.Client.RESTMapper() != nil {
+			if mapping, err := r.Client.RESTMapper().RESTMapping(schema.GroupKind{Group: group, Kind: machineKind}); err == nil {
+				add(mapping.GroupVersionKind)
+			}
+		}
+	}
+	return out
 }
 
 // machineFromTemplate builds the provider machine from the template

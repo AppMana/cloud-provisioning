@@ -72,19 +72,14 @@ rules:
     resources: ["clusters/status"]
     verbs: ["get", "patch"]
   # Provider machine objects: read (join reconciler waits on
-  # existence), create (claim reconciler). CAPA/CAPG cluster/identity
-  # objects: read-only preflight (aws.Provider.Validate).
+  # existence), create (claim reconciler). CAPA/CAPG/CAPZ/generic CAPI
+  # cluster/identity/template objects: read, create, patch, delete.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsmachines", "gcpmachines", "dockermachines"]
     verbs: ["get", "create", "delete"]
-  # Read across the whole infrastructure group. A claim names its
-  # machine template by apiGroup and kind, and the machine created is
-  # that kind without the Template suffix, so which resources exist is
-  # the provider's choice rather than something this chart can list.
-  # Reads only: the writes above stay limited to the machine kinds.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["*"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
   # Same reason as clusters/status above.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsclusters/status", "gcpclusters/status", "dockerclusters/status"]

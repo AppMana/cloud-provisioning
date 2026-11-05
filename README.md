@@ -6,49 +6,148 @@ public ingress and elastic compute without exposing the control plane.
 
 ## Install and use
 
-Configure Cluster API, your infrastructure provider and credentials using the
-[AWS setup](docs/aws.md). Then install the chart with an explicit published version:
+Configure Cluster API and your cloud infrastructure provider(s). By default, `cloud-provisioning` runs a **full-mesh WireGuard tunnel across every node** (`tunnel.endpoints: "all"`).
+
+> **Important:** Remote cloud workers **always** run the WireGuard tunnel (via first-boot bootstrap and `tunnel-dialer-remote` on Linux, or `windows-tunnel.exe` on Windows). They can never be omitted by `tunnel.endpoints`. The `tunnel.endpoints` setting only chooses which **on-premises Linux nodes** terminate tunnels:
+> - **Full Mesh (default, `tunnel.endpoints: "all"`)**: Every on-premises Linux node (control-plane and worker) + all remote cloud nodes run the tunnel.
+> - **Designated On-Premises Gateways (`tunnel.endpoints` selector + `transitBGPPort`)**: Only the selected on-premises gateway nodes + all remote cloud nodes run the tunnel, and the gateway nodes advertise remote routes to the rest of the on-premises cluster.
+
+### 1. Default HelmRelease: Full Mesh (Every Node Runs the Tunnel)
+
+See [`examples/helm-release.yaml`](examples/helm-release.yaml):
+
+```yaml
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: cloud-provisioning
+  namespace: cloud-provisioning
+spec:
+  interval: 10m
+  url: oci://ghcr.io/appmana/charts/cloud-provisioning
+  ref:
+    tag: 0.1.23
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloud-provisioning
+  namespace: cloud-provisioning
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: cloud-provisioning
+  values:
+    joinProvider: k0s
+    tunnel:
+      endpoints: "all" # default: every on-prem Linux node + all remote cloud nodes
+```
+
+Or install directly with Helm:
 
 ```sh
 helm upgrade --install cloud-provisioning \
   oci://ghcr.io/appmana/charts/cloud-provisioning --version "$CHART_VERSION" \
   --namespace cloud-provisioning --create-namespace \
-  --set providerManagerNamespace=capa-system \
-  --set-string tunnel.endpoints='kubernetes.io/hostname=worker-1'
+  -f examples/helm-release.yaml
 ```
 
-Online Helm upgrades preserve the dialer's existing named adoption-Secret grants.
-Rendering offline cannot read those grants. For a rendered-manifest upgrade,
-render against the target API and retain those exact bytes; keep machine
-membership stable between rendering and applying the RBAC resources.
+### 2. Gateway HelmRelease: Specific On-Premises Nodes + All Remote Nodes
 
-For Linux receiver-preparation testing, `tunnel.receivePreparation` accepts
-`nativeCIDRs` (the complete protected cloud network ranges) and `ports` (distinct
-UDP listener ports already permitted by the worker's security groups, excluding
-the existing WireGuard port). The controller stages additional receivers through
-the normal adoption reconciliation. This experimental setting requires agents
-with receiver support; it freezes active peer-list updates and retains existing
-endpoints. It does not activate routes or complete a handover. Removing the
-setting does not discard a persisted proposal or release its forwarding base.
-An optional `journal` object supplies explicit `roundLifetime`, `maxReceiptAge`
-and `drainInterval` duration strings. This persists the validated public plan
-and initial prepare round in a controller-owned ConfigMap, bound to the cluster
-and Machine UIDs. Reconciliation resumes that exact journal; it does not renew
-expired rounds or advance phases. Choose the drain bound for the deployment's
-packet lifetime before enabling phase execution.
+If you only want specific on-premises nodes to terminate WAN tunnels while all remote cloud workers still run the tunnel, see [`examples/helm-release-gateways.yaml`](examples/helm-release-gateways.yaml):
 
-Apply [a worker template and claim](examples/aws-worker.yaml). Claims create
-billable resources; deleting one removes its worker. The chart uses these
-Linux amd64/arm64 images:
+```yaml
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloud-provisioning
+  namespace: cloud-provisioning
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: cloud-provisioning
+  values:
+    joinProvider: k0s
+    tunnel:
+      endpoints:
+        matchLabels:
+          tunnel-gateway: "true"
+        # Or select specific on-premises nodes by name:
+        # nodeNames: ["onprem-gateway-1", "onprem-gateway-2"]
+    transit:
+      bgpPort: 1790
+```
 
-- ghcr.io/appmana/cloud-provisioning-endpoint-controller
-- ghcr.io/appmana/cloud-provisioning-dialer
+## Cluster API Providers & Mixed Remote Clusters
 
-Use matching published chart/image versions. By default, first-boot dialer
-bootstrap downloads the latest published multi-architecture / universal release
-binary (`dialerBinary.version: "latest"`, with no manual SHA-256 pinning required
-unless explicitly overridden; see [AWS setup](docs/aws.md)). No Windows controller
-image is required to manage Windows workers.
+`cloud-provisioning` supports **multiple Cluster API infrastructure providers simultaneously in the same cluster** (e.g., AWS + GCP + Azure/Hetzner/OpenStack):
+
+| Provider | Package | What It Specializes |
+| --- | --- | --- |
+| **AWS (CAPA)** | `controller/pkg/join/aws` | Maps `AWSMachineTemplate` $\rightarrow$ `AWSMachine` $\leftrightarrow$ `AWSCluster`. Runs preflight checks on CAPA credentials (`AWSClusterStaticIdentity` / `AWSClusterRoleIdentity`) and security groups, and supports optional native AWS VPC CNI (`cloud-provisioning.appmana.com/cni: aws-vpc`). |
+| **Google Cloud (CAPG)** | `controller/pkg/join/gcp` | Maps `GCPMachineTemplate` $\rightarrow$ `GCPMachine` $\leftrightarrow$ `GCPCluster`. Injects GCE metadata discovery (`http://metadata.google.internal/computeMetadata/v1/...`) into first-boot userdata so kubelet registers with `--provider-id=gce://<project>/<zone>/<name>`, matching CAPG's `GCPMachine.spec.providerID`. |
+| **Generic CAPI (Fallback)** | `controller/pkg/join/generic` | Automatically handles **any** standard Cluster API infrastructure provider (`<Kind>Template` $\rightarrow$ `<Kind>Machine` $\leftrightarrow$ `<Kind>Cluster`, such as `AzureMachineTemplate`/`AzureCluster`, `OpenStackMachineTemplate`/`OpenStackCluster`, `HetznerBareMetalMachineTemplate`/`HetznerCluster`, `VSphereMachineTemplate`/`VSphereCluster`). Uses `spec.providerID` / `status.addresses` when pre-populated by the provider, or falls back to multi-cloud metadata discovery (Azure IMDS, GCE, EC2 IMDSv2, Hetzner, DigitalOcean, OpenStack, or `/etc/cloud-provisioning/provider-id`). |
+| **Labcontainers / Docker** | `controller/pkg/join/labcontainers`, `controller/pkg/join/docker` | Adopts simulated WAN nodes (`LabMachineTemplate` / `LabCluster`) or Docker containers (`DockerMachineTemplate` / `DockerCluster`) for integration testing. |
+
+### Provisioning Multiple Machines Across Mixed Clouds
+
+In [`examples/mixed-cloud-workers.yaml`](examples/mixed-cloud-workers.yaml), `AWSCluster`, `GCPCluster`, and `AzureCluster` coexist in the `cloud-provisioning` namespace. Each `ProvisionedNodeClaim` simply points to the desired `*MachineTemplate` — the controller automatically routes the claim to the matching CAPI `Cluster` (`AWSMachineTemplate` $\rightarrow$ `AWSCluster`, `GCPMachineTemplate` $\rightarrow$ `GCPCluster`, `AzureMachineTemplate` $\rightarrow$ `AzureCluster`), allocates a unique WireGuard IP, and renders the node's bootstrap `Secret`.
+
+To provision additional machines, commit one `ProvisionedNodeClaim` per worker referencing any template:
+
+```yaml
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: aws-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachineTemplate
+    name: aws-ubuntu-amd64
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: aws-worker-2
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachineTemplate
+    name: aws-ubuntu-amd64
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: gcp-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: GCPMachineTemplate
+    name: gcp-ubuntu-amd64
+---
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: azure-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AzureMachineTemplate
+    name: azure-ubuntu-amd64
+```
+
+Deleting a `ProvisionedNodeClaim` drains the node, deletes the CAPI `Machine` and cloud instance, and releases its peer entry.
+
+### Labcontainers Integration Testing with the Example Manifests
+
+The Labcontainers e2e harness (`harness/e2e/install` and `harness/e2e/claim`) consumes [`examples/helm-release.yaml`](examples/helm-release.yaml) directly when installing the chart onto the simulated cluster, and [`examples/labcontainers-workers.yaml`](examples/labcontainers-workers.yaml) shows provisioning multiple simulated remote workers (`remote1`, `remote2`).
 
 ## Platform tuple preflight, automated remediation, and GitOps persistence
 

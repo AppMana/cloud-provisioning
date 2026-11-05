@@ -1,0 +1,28 @@
+# Gateway HelmRelease: Specific On-Premises Gateway Nodes + All Remote Cloud Nodes
+#
+# Remote cloud workers ALWAYS run the WireGuard tunnel.
+# When you only want specific on-premises nodes to terminate WAN tunnels and relay
+# traffic for the rest of the on-premises cluster, set tunnel.endpoints to select
+# those on-premises nodes and enable tunnel.transitBGPPort.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloud-provisioning
+  namespace: cloud-provisioning
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: cloud-provisioning
+  values:
+    joinProvider: k0s
+    tunnel:
+      endpoints:
+        matchLabels:
+          tunnel-gateway: "true"
+        # Or select specific on-premises nodes by name:
+        # nodeNames:
+        #   - onprem-gateway-1
+        #   - onprem-gateway-2
+    transit:
+      bgpPort: 1790

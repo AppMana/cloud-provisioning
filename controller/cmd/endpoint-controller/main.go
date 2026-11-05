@@ -43,6 +43,7 @@ import (
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
 	joingcp "github.com/appmana/cloud-provisioning/controller/pkg/join/gcp"
+	joingeneric "github.com/appmana/cloud-provisioning/controller/pkg/join/generic"
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
 	joink3s "github.com/appmana/cloud-provisioning/controller/pkg/join/k3s"
 	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
@@ -607,7 +608,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
-	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names their distribution's role label (node-role.kubernetes.io/control-plane, node.k0sproject.io/role or node.kubernetes.io/microk8s-controlplane) or is \"all\"")
+	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "all", "selector choosing which on-premises Linux nodes terminate tunnels; default \"all\" (or empty) places the tunnel on every on-premises Linux node (control-plane and worker) for a full mesh alongside all remote cloud workers. Accepts \"all\", a label selector (k=v,k2=v2), or a JSON TunnelEndpointSelector object")
 	flag.StringVar(&siteDialerSelectorRaw, "site-dialer-node-selector", "", "additional label selector admitting site dialers; empty preserves all Linux site nodes; selected tunnel endpoints must be admitted")
 	flag.DurationVar(&endpointRetention, "tunnel-endpoint-retention", 3*time.Minute, "how long a node that has left --tunnel-endpoints goes on being one: dialer still scheduled, entries still published, tunnel still carrying traffic. A remote reads its peer list over the tunnel it is about to lose, so this is the time it is given to read the one naming the replacement, and it is measured in the dialer's 30s poll interval rather than in anything about the departing node's health")
 	flag.StringVar(&dialerPrivateKeyDir, "dialer-private-key-dir", "/var/lib/cloud-provisioning", "host directory where each node's dialer keeps its own WireGuard private key (generated on first start; never leaves the node)")
@@ -915,7 +916,8 @@ func main() {
 	// hidden behind a build tag, so a harness exercises the same binary
 	// that is released.
 	labcontainersProvider := joinlabcontainers.Provider{}
-	infraProviders := []join.InfraProvider{awsProvider, gcpProvider, dockerProvider, labcontainersProvider}
+	genericProvider := joingeneric.Provider{}
+	infraProviders := []join.InfraProvider{awsProvider, gcpProvider, dockerProvider, labcontainersProvider, genericProvider}
 
 	excluder, err := siteExcluder(mgr.GetClient(), mgr.GetAPIReader(), infraProviders, *siteCNIDaemonSets)
 	if err != nil {
@@ -1195,7 +1197,7 @@ func main() {
 				MeshName:                  secretName,
 				RetirementMaxAge:          claimRetirementAge,
 				Reader:                    mgr.GetAPIReader(),
-				Provisioners:              []join.MachineProvisioner{awsProvider, gcpProvider, dockerProvider, labcontainersProvider},
+				Provisioners:              []join.MachineProvisioner{awsProvider, gcpProvider, dockerProvider, labcontainersProvider, genericProvider},
 				RoleLabel:                 cloudWorkerRoleLabel,
 				RoleValue:                 cloudWorkerRoleValue,
 				BootstrapSecretNameFormat: bootstrapSecretNameFormat,

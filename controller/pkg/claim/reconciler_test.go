@@ -1,19 +1,23 @@
 package claim
 
 import (
-	"encoding/json"
-
 	"context"
-	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
+	"sigs.k8s.io/yaml"
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joingcp "github.com/appmana/cloud-provisioning/controller/pkg/join/gcp"
+	joingeneric "github.com/appmana/cloud-provisioning/controller/pkg/join/generic"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,7 +53,12 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(clusterListGVK, &unstructured.UnstructuredList{})
 	awsMachineGVK := joinaws.Provider{}.GVK()
-	for _, kind := range []string{"AWSMachine", "AWSMachineTemplate", "AWSCluster", "GCPMachine", "GCPMachineTemplate", "GCPCluster", "DockerMachine", "DockerMachineTemplate"} {
+	for _, kind := range []string{
+		"AWSMachine", "AWSMachineTemplate", "AWSCluster",
+		"GCPMachine", "GCPMachineTemplate", "GCPCluster",
+		"AzureMachine", "AzureMachineTemplate", "AzureCluster",
+		"DockerMachine", "DockerMachineTemplate",
+	} {
 		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind), &unstructured.Unstructured{})
 		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
 	}
@@ -133,28 +143,41 @@ func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	t.Helper()
 	scheme := testScheme(t)
-	// Every Cluster's AWSCluster, in a region, unless the test gives one.
+	// Every Cluster's infrastructure Cluster, unless the test gives one.
 	for _, obj := range objs {
 		if u, ok := obj.(*unstructured.Unstructured); ok && u.GetKind() == "Cluster" {
 			name, _, _ := unstructured.NestedString(u.Object, "spec", "infrastructureRef", "name")
+			kind, _, _ := unstructured.NestedString(u.Object, "spec", "infrastructureRef", "kind")
+			if kind == "" {
+				kind = "AWSCluster"
+			}
 			infra := &unstructured.Unstructured{}
-			infra.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: "AWSCluster"})
+			infra.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: kind})
 			infra.SetNamespace(u.GetNamespace())
 			infra.SetName(name)
 			_ = unstructured.SetNestedField(infra.Object, "us-west-2", "spec", "region")
 			present := false
 			for _, other := range objs {
-				present = present || other.GetObjectKind().GroupVersionKind().Kind == "AWSCluster" && other.GetName() == name
+				present = present || other.GetObjectKind().GroupVersionKind().Kind == kind && other.GetName() == name
 			}
 			if !present {
 				objs = append(objs, infra)
 			}
 		}
 	}
+	statusSubresources := []client.Object{&v1alpha1.ProvisionedNodeClaim{}}
+	uCluster := &unstructured.Unstructured{}
+	uCluster.SetGroupVersionKind(clusterGVK)
+	statusSubresources = append(statusSubresources, uCluster)
+	for _, kind := range []string{"AWSCluster", "GCPCluster", "AzureCluster"} {
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: kind})
+		statusSubresources = append(statusSubresources, u)
+	}
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRESTMapper(servedBy(scheme)).
-		WithStatusSubresource(&v1alpha1.ProvisionedNodeClaim{}).
+		WithStatusSubresource(statusSubresources...).
 		WithObjects(objs...).
 		Build()
 	return &Reconciler{
@@ -837,14 +860,36 @@ func TestReconcile_MultiCAPI_AWSAndGCPInSameNamespace(t *testing.T) {
 	gcpCluster := fakeCluster("appmana-gcp")
 	_ = unstructured.SetNestedField(gcpCluster.Object, "GCPCluster", "spec", "infrastructureRef", "kind")
 
-	r := newClaimReconciler(t, awsClaim, gcpClaim, fakeTemplate("aws-worker"), gcpTemplate, fakeCluster("appmana-aws"), gcpCluster, awsConfigSecret(), fakeNode())
-	r.Provisioners = append(r.Provisioners, joingcp.Provider{})
+	azureClaim := &v1alpha1.ProvisionedNodeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "azure-worker", Namespace: "default", UID: "claim-azure-1"},
+		Spec: v1alpha1.ProvisionedNodeClaimSpec{
+			InfrastructureRef: corev1.TypedLocalObjectReference{APIGroup: &infraGroup, Kind: "AzureMachineTemplate", Name: "azure-worker"},
+		},
+	}
+	azureTemplate := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "AzureMachineTemplate",
+		"metadata":   map[string]any{"name": "azure-worker", "namespace": "default"},
+		"spec": map[string]any{
+			"template": map[string]any{
+				"spec": map[string]any{"vmSize": "Standard_D4s_v5"},
+			},
+		},
+	}}
+	azureCluster := fakeCluster("appmana-azure")
+	_ = unstructured.SetNestedField(azureCluster.Object, "AzureCluster", "spec", "infrastructureRef", "kind")
+
+	r := newClaimReconciler(t, awsClaim, gcpClaim, azureClaim, fakeTemplate("aws-worker"), gcpTemplate, azureTemplate, fakeCluster("appmana-aws"), gcpCluster, azureCluster, awsConfigSecret(), fakeNode())
+	r.Provisioners = append(r.Provisioners, joingcp.Provider{}, joingeneric.Provider{})
 
 	if err := reconcileClaim(t, r, awsClaim); err != nil {
 		t.Fatalf("reconciling AWS claim in multi-CAPI namespace: %v", err)
 	}
 	if err := reconcileClaim(t, r, gcpClaim); err != nil {
 		t.Fatalf("reconciling GCP claim in multi-CAPI namespace: %v", err)
+	}
+	if err := reconcileClaim(t, r, azureClaim); err != nil {
+		t.Fatalf("reconciling generic CAPI (Azure) claim in multi-CAPI namespace: %v", err)
 	}
 
 	awsMachine := &unstructured.Unstructured{}
@@ -863,5 +908,82 @@ func TestReconcile_MultiCAPI_AWSAndGCPInSameNamespace(t *testing.T) {
 	}
 	if got, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "clusterName"); got != "appmana-gcp" {
 		t.Fatalf("gcp-worker clusterName = %q, want appmana-gcp", got)
+	}
+
+	azureMachine := &unstructured.Unstructured{}
+	azureMachine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "azure-worker"}, azureMachine); err != nil {
+		t.Fatalf("expected azure-worker Machine: %v", err)
+	}
+	if got, _, _ := unstructured.NestedString(azureMachine.Object, "spec", "clusterName"); got != "appmana-azure" {
+		t.Fatalf("azure-worker clusterName = %q, want appmana-azure", got)
+	}
+	if got, _, _ := unstructured.NestedString(azureMachine.Object, "spec", "infrastructureRef", "kind"); got != "AzureMachine" {
+		t.Fatalf("azure-worker infrastructureRef.kind = %q, want AzureMachine", got)
+	}
+}
+
+func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "examples", "mixed-cloud-workers.yaml"))
+	if err != nil {
+		t.Fatalf("reading examples/mixed-cloud-workers.yaml: %v", err)
+	}
+	var initObjects []client.Object
+	var claims []*v1alpha1.ProvisionedNodeClaim
+	for _, doc := range strings.Split(string(raw), "\n---") {
+		var u unstructured.Unstructured
+		if err := yaml.Unmarshal([]byte(doc), &u.Object); err != nil {
+			t.Fatalf("unmarshaling YAML doc: %v", err)
+		}
+		if len(u.Object) == 0 || u.GetKind() == "" {
+			continue
+		}
+		if u.GetKind() == "ProvisionedNodeClaim" {
+			var c v1alpha1.ProvisionedNodeClaim
+			if err := yaml.Unmarshal([]byte(doc), &c); err != nil {
+				t.Fatalf("unmarshaling ProvisionedNodeClaim: %v", err)
+			}
+			c.UID = types.UID("uid-" + c.Name)
+			initObjects = append(initObjects, &c)
+			claims = append(claims, &c)
+			continue
+		}
+		initObjects = append(initObjects, &u)
+	}
+	initObjects = append(initObjects, awsConfigSecret(), fakeNode())
+
+	r := newClaimReconciler(t, initObjects...)
+	r.Provisioners = append(r.Provisioners, joingcp.Provider{}, joingeneric.Provider{})
+
+	if len(claims) != 4 {
+		t.Fatalf("expected 4 ProvisionedNodeClaims in examples/mixed-cloud-workers.yaml, got %d", len(claims))
+	}
+	for _, c := range claims {
+		if err := reconcileClaim(t, r, c); err != nil {
+			t.Fatalf("reconciling %s: %v", c.Name, err)
+		}
+	}
+
+	wantMachines := map[string]struct {
+		clusterName string
+		infraKind   string
+	}{
+		"aws-worker-1":   {clusterName: "site-aws", infraKind: "AWSMachine"},
+		"aws-worker-2":   {clusterName: "site-aws", infraKind: "AWSMachine"},
+		"gcp-worker-1":   {clusterName: "site-gcp", infraKind: "GCPMachine"},
+		"azure-worker-1": {clusterName: "site-azure", infraKind: "AzureMachine"},
+	}
+	for name, want := range wantMachines {
+		m := &unstructured.Unstructured{}
+		m.SetGroupVersionKind(machineGVK)
+		if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: name}, m); err != nil {
+			t.Fatalf("expected Machine %s: %v", name, err)
+		}
+		if got, _, _ := unstructured.NestedString(m.Object, "spec", "clusterName"); got != want.clusterName {
+			t.Fatalf("%s clusterName = %q, want %q", name, got, want.clusterName)
+		}
+		if got, _, _ := unstructured.NestedString(m.Object, "spec", "infrastructureRef", "kind"); got != want.infraKind {
+			t.Fatalf("%s infrastructureRef.kind = %q, want %q", name, got, want.infraKind)
+		}
 	}
 }

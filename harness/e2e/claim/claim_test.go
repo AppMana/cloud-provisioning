@@ -1,6 +1,8 @@
 package claim
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -55,6 +57,26 @@ func TestEveryObjectLandsInTheSameNamespace(t *testing.T) {
 	for _, doc := range docs {
 		if !strings.Contains(doc, "namespace: "+Namespace) {
 			t.Errorf("an object is not in %s:\n%s", Namespace, doc)
+		}
+	}
+}
+
+func TestExampleLabcontainersWorkersManifestMatchesHarnessObjects(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "examples", "labcontainers-workers.yaml"))
+	if err != nil {
+		t.Fatalf("reading examples/labcontainers-workers.yaml: %v", err)
+	}
+	manifest := string(raw)
+	for _, want := range []string{
+		"kind: LabCluster",
+		"kind: Cluster",
+		"name: remote1",
+		"name: remote2",
+		"kind: LabMachineTemplate",
+		"kind: ProvisionedNodeClaim",
+	} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("examples/labcontainers-workers.yaml missing %q", want)
 		}
 	}
 }

@@ -426,7 +426,8 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 								// boot.
 								fmt.Sprintf("--listen-port=%s", r.dialerCloudListenPort),
 								"--keepalive-seconds=15",
-								"--mtu=1420",
+								// No --mtu: derived from the default route underlay (e.g. 1380 on
+								// GCP 1460-MTU VPCs, 1420 on 1500/9001-MTU networks).
 								"--poll-interval=30s",
 							},
 							VolumeMounts: []corev1.VolumeMount{

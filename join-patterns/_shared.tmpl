@@ -42,6 +42,13 @@ ssh_authorized_keys:
       [Network]
       ManageForeignRoutingPolicyRules=no
       ManageForeignRoutes=no
+  - path: /etc/NetworkManager/conf.d/90-cloud-provisioning.conf
+    permissions: '0644'
+    content: |
+      # Prevent NetworkManager (default on RHEL/Rocky/Alma and some Debian/Ubuntu
+      # cloud images) from managing or flushing the WireGuard tunnel or CNI links.
+      [keyfile]
+      unmanaged-devices=interface-name:cldt*;interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico
   - path: /etc/wg-dialer/peers.json
     permissions: '0600'
     content: |
@@ -77,7 +84,6 @@ which is the whole reason wg-apiproxy is a separate unit. */}}
         --peers-file=/etc/wg-dialer/peers.json \
         --listen-port={{ .wireguardListenPort }} \
         --keepalive-seconds=15 \
-        --mtu=1420 \
         --poll-interval=30s
       Restart=always
       # Re-exec hourly so the unit converges onto whatever binary is at
@@ -143,6 +149,32 @@ binary that is already executing, and the kernel refuses that
 {{- define "dialer-install" }}
   - |
     set -e
+    need_pkg=0
+    for cmd in curl tar gzip iptables conntrack socat ip; do
+      command -v "$cmd" >/dev/null 2>&1 || need_pkg=1
+    done
+    if [ "$need_pkg" -eq 1 ]; then
+      if command -v apt-get >/dev/null 2>&1; then
+        DEBIAN_FRONTEND=noninteractive apt-get update -q
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q ca-certificates curl tar gzip iptables conntrack socat iproute2
+      elif command -v dnf >/dev/null 2>&1; then
+        pkgs="ca-certificates tar gzip iptables conntrack-tools socat iproute"
+        command -v curl >/dev/null 2>&1 || pkgs="$pkgs curl"
+        dnf install -y -q $pkgs
+      elif command -v yum >/dev/null 2>&1; then
+        pkgs="ca-certificates tar gzip iptables conntrack-tools socat iproute"
+        command -v curl >/dev/null 2>&1 || pkgs="$pkgs curl"
+        yum install -y -q $pkgs
+      elif command -v zypper >/dev/null 2>&1; then
+        zypper --non-interactive install -y ca-certificates curl tar gzip iptables conntrack-tools socat iproute2
+      fi
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+      firewall-cmd --add-port={{ .wireguardListenPort }}/udp || true
+      firewall-cmd --permanent --add-port={{ .wireguardListenPort }}/udp || true
+      firewall-cmd --zone=trusted --add-interface={{ .interfaceName }} || true
+      firewall-cmd --permanent --zone=trusted --add-interface={{ .interfaceName }} || true
+    fi
     case "$(uname -m)" in
       aarch64|arm64) url='{{ .dialerBinaryURLArm64 }}'; sha='{{ .dialerBinarySHA256Arm64 }}' ;;
       x86_64|amd64)  url='{{ .dialerBinaryURLAmd64 }}'; sha='{{ .dialerBinarySHA256Amd64 }}' ;;
@@ -157,6 +189,9 @@ binary that is already executing, and the kernel refuses that
       mv -f /usr/local/bin/.wg-dialer.elf /usr/local/bin/.wg-dialer.new
     fi
     mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
+    if command -v restorecon >/dev/null 2>&1; then
+      restorecon -F /usr/local/bin/wg-dialer /usr/local/bin/cloud-provider-identity 2>/dev/null || true
+    fi
   - systemctl daemon-reload
   - systemctl enable --now wg-dialer.service
 {{- if .apiProxyPort }}

@@ -117,6 +117,16 @@ type ClassValidator interface {
 	ValidateClass(ctx context.Context, c client.Reader, infraMachine *unstructured.Unstructured, class platform.Class) error
 }
 
+// InfraMachinePreparer is an optional MachineProvisioner capability that
+// normalizes a provider Machine spec copied from a template before creation
+// (e.g. defaulting publicIP, stock Ubuntu imageFamily, and the Debian/RHEL
+// cloud-init startup-script bridge on GCPMachine, or allocatePublicIP on
+// AzureMachine, and extracting any failureDomain/zone placement meant for
+// the parent CAPI Machine).
+type InfraMachinePreparer interface {
+	PrepareInfraMachine(infraMachine *unstructured.Unstructured) (failureDomain string, err error)
+}
+
 // NodeLocalBalancer is an optional capability a ClusterJoinProvider
 // implements when its distribution ships no node-local balancing of
 // its own, so a joining worker needs the operator's loopback balancer

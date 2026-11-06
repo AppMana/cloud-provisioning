@@ -50,6 +50,28 @@ func (p Provider) ClusterGVK() schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: DefaultInfraGroup, Version: DefaultInfraVersion, Kind: "GenericCluster"}
 }
 
+// PrepareInfraMachine implements join.InfraMachinePreparer for generic CAPI providers.
+func (Provider) PrepareInfraMachine(infraMachine *unstructured.Unstructured) (string, error) {
+	if infraMachine == nil {
+		return "", nil
+	}
+	var failureDomain string
+	if fd, found, _ := unstructured.NestedString(infraMachine.Object, "spec", "failureDomain"); found && fd != "" {
+		failureDomain = fd
+	}
+	// On an externally-managed AzureCluster (CAPZ), there is no CAPZ-managed
+	// Outbound Load Balancer, so worker NICs require allocatePublicIP: true
+	// for outbound internet and inbound WireGuard reachability.
+	if infraMachine.GetKind() == "AzureMachine" {
+		if _, found, _ := unstructured.NestedBool(infraMachine.Object, "spec", "allocatePublicIP"); !found {
+			if err := unstructured.SetNestedField(infraMachine.Object, true, "spec", "allocatePublicIP"); err != nil {
+				return "", err
+			}
+		}
+	}
+	return failureDomain, nil
+}
+
 // MatchesMachineKind reports whether generic CAPI fallback can handle a Machine's
 // infrastructureRef (any *Machine kind in a CAPI infrastructure group).
 func (Provider) MatchesMachineKind(group, kind string) bool {

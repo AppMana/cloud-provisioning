@@ -56,15 +56,21 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	scheme.AddKnownTypeWithName(machineListGVK, &unstructured.UnstructuredList{})
 	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(clusterListGVK, &unstructured.UnstructuredList{})
-	awsMachineGVK := joinaws.Provider{}.GVK()
+	v1beta2GV := schema.GroupVersion{Group: infraGroup, Version: "v1beta2"}
 	for _, kind := range []string{
 		"AWSMachine", "AWSMachineTemplate", "AWSCluster", "AWSClusterStaticIdentity", "AWSClusterRoleIdentity",
-		"GCPMachine", "GCPMachineTemplate", "GCPCluster",
-		"AzureMachine", "AzureMachineTemplate", "AzureCluster",
 		"DockerMachine", "DockerMachineTemplate",
 	} {
-		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind), &unstructured.Unstructured{})
-		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
+		scheme.AddKnownTypeWithName(v1beta2GV.WithKind(kind), &unstructured.Unstructured{})
+		scheme.AddKnownTypeWithName(v1beta2GV.WithKind(kind+"List"), &unstructured.UnstructuredList{})
+	}
+	v1beta1GV := schema.GroupVersion{Group: infraGroup, Version: "v1beta1"}
+	for _, kind := range []string{
+		"GCPMachine", "GCPMachineTemplate", "GCPCluster",
+		"AzureMachine", "AzureMachineTemplate", "AzureCluster",
+	} {
+		scheme.AddKnownTypeWithName(v1beta1GV.WithKind(kind), &unstructured.Unstructured{})
+		scheme.AddKnownTypeWithName(v1beta1GV.WithKind(kind+"List"), &unstructured.UnstructuredList{})
 	}
 	return scheme
 }
@@ -147,6 +153,7 @@ func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	t.Helper()
 	scheme := testScheme(t)
+	mapper := servedBy(scheme)
 	// Every Cluster's infrastructure Cluster, unless the test gives one.
 	for _, obj := range objs {
 		if u, ok := obj.(*unstructured.Unstructured); ok && u.GetKind() == "Cluster" {
@@ -155,8 +162,12 @@ func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 			if kind == "" {
 				kind = "AWSCluster"
 			}
+			ver := "v1beta2"
+			if m, err := mapper.RESTMapping(schema.GroupKind{Group: infraGroup, Kind: kind}); err == nil && m.GroupVersionKind.Version != "" {
+				ver = m.GroupVersionKind.Version
+			}
 			infra := &unstructured.Unstructured{}
-			infra.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: kind})
+			infra.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: ver, Kind: kind})
 			infra.SetNamespace(u.GetNamespace())
 			infra.SetName(name)
 			_ = unstructured.SetNestedField(infra.Object, "us-west-2", "spec", "region")
@@ -173,14 +184,18 @@ func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	uCluster := &unstructured.Unstructured{}
 	uCluster.SetGroupVersionKind(clusterGVK)
 	statusSubresources = append(statusSubresources, uCluster)
-	for _, kind := range []string{"AWSCluster", "GCPCluster", "AzureCluster"} {
+	for _, gvk := range []schema.GroupVersionKind{
+		{Group: infraGroup, Version: "v1beta2", Kind: "AWSCluster"},
+		{Group: infraGroup, Version: "v1beta1", Kind: "GCPCluster"},
+		{Group: infraGroup, Version: "v1beta1", Kind: "AzureCluster"},
+	} {
 		u := &unstructured.Unstructured{}
-		u.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: kind})
+		u.SetGroupVersionKind(gvk)
 		statusSubresources = append(statusSubresources, u)
 	}
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithRESTMapper(servedBy(scheme)).
+		WithRESTMapper(mapper).
 		WithStatusSubresource(statusSubresources...).
 		WithObjects(objs...).
 		Build()
@@ -852,7 +867,7 @@ func TestReconcile_MultiCAPI_AWSAndGCPInSameNamespace(t *testing.T) {
 		},
 	}
 	gcpTemplate := &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
 		"kind":       "GCPMachineTemplate",
 		"metadata":   map[string]any{"name": "gcp-worker", "namespace": "default"},
 		"spec": map[string]any{
@@ -871,7 +886,7 @@ func TestReconcile_MultiCAPI_AWSAndGCPInSameNamespace(t *testing.T) {
 		},
 	}
 	azureTemplate := &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
 		"kind":       "AzureMachineTemplate",
 		"metadata":   map[string]any{"name": "azure-worker", "namespace": "default"},
 		"spec": map[string]any{
@@ -1140,6 +1155,15 @@ func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
 		if gotName := strings.TrimSpace(filesByPath["/etc/wg-dialer/machine-name"]); gotName != name {
 			t.Fatalf("%s /etc/wg-dialer/machine-name = %q, want %q", name, gotName, name)
 		}
+		if strings.Contains(filesByPath["/etc/systemd/system/wg-dialer.service"], "--mtu=1420") {
+			t.Fatalf("%s wg-dialer.service must not hardcode --mtu=1420 (breaks GCP 1460 MTU VPCs)", name)
+		}
+		if !strings.Contains(filesByPath["/etc/NetworkManager/conf.d/90-cloud-provisioning.conf"], "unmanaged-devices=") {
+			t.Fatalf("%s missing NetworkManager unmanaged-devices config", name)
+		}
+		if len(doc.RunCmd) == 0 || !strings.Contains(doc.RunCmd[0], "apt-get") || !strings.Contains(doc.RunCmd[0], "dnf") || !strings.Contains(doc.RunCmd[0], "yum") {
+			t.Fatalf("%s first runcmd does not contain cross-distro package bootstrap: %v", name, doc.RunCmd)
+		}
 
 		var peersDoc tunnel.PeersFileDoc
 		if err := json.Unmarshal([]byte(filesByPath["/etc/wg-dialer/peers.json"]), &peersDoc); err != nil {
@@ -1160,6 +1184,49 @@ func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
 		// runcmd identity/node-IP discovery block in sh -e against simulated
 		// cloud metadata endpoints to verify real guest execution.
 		executeRenderedCloudInitDiscovery(t, name, want.cloud, filesByPath["/usr/local/bin/cloud-provider-identity"], doc.RunCmd, want.wantID, want.wantNodeIP)
+		executeRenderedCrossDistroBootstrap(t, name, doc.RunCmd[0])
+	}
+
+	// Verify CAPG & CAPZ infrastructure specializations on the expanded objects.
+	gcpCluster := &unstructured.Unstructured{}
+	gcpCluster.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta1", Kind: "GCPCluster"})
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: "site-gcp"}, gcpCluster); err != nil {
+		t.Fatalf("getting GCPCluster site-gcp: %v", err)
+	}
+	fds, _, _ := unstructured.NestedMap(gcpCluster.Object, "status", "failureDomains")
+	if _, ok := fds["us-central1-a"]; !ok {
+		t.Fatalf("GCPCluster status.failureDomains = %+v, want us-central1-a populated for external CAPG cluster", fds)
+	}
+
+	gcpMachine := &unstructured.Unstructured{}
+	gcpMachine.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta1", Kind: "GCPMachine"})
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: "gcp-worker-1"}, gcpMachine); err != nil {
+		t.Fatalf("getting GCPMachine gcp-worker-1: %v", err)
+	}
+	if pub, _, _ := unstructured.NestedBool(gcpMachine.Object, "spec", "publicIP"); !pub {
+		t.Fatal("GCPMachine spec.publicIP must default to true so GCE VM gets ONE_TO_ONE_NAT ExternalIP")
+	}
+	metaSlice, _, _ := unstructured.NestedSlice(gcpMachine.Object, "spec", "additionalMetadata")
+	if len(metaSlice) == 0 {
+		t.Fatal("GCPMachine spec.additionalMetadata must contain startup-script cloud-init bridge for Debian-12/RHEL")
+	}
+
+	gcpCapiMachine := &unstructured.Unstructured{}
+	gcpCapiMachine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: "gcp-worker-1"}, gcpCapiMachine); err != nil {
+		t.Fatalf("getting CAPI Machine gcp-worker-1: %v", err)
+	}
+	if fd, _, _ := unstructured.NestedString(gcpCapiMachine.Object, "spec", "failureDomain"); fd != "us-central1-a" {
+		t.Fatalf("CAPI Machine gcp-worker-1 spec.failureDomain = %q, want us-central1-a", fd)
+	}
+
+	azureMachine := &unstructured.Unstructured{}
+	azureMachine.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta1", Kind: "AzureMachine"})
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: "azure-worker-1"}, azureMachine); err != nil {
+		t.Fatalf("getting AzureMachine azure-worker-1: %v", err)
+	}
+	if allocPub, _, _ := unstructured.NestedBool(azureMachine.Object, "spec", "allocatePublicIP"); !allocPub {
+		t.Fatal("AzureMachine spec.allocatePublicIP must default to true on external AzureCluster")
 	}
 }
 
@@ -1275,5 +1342,76 @@ exit 22
 	}
 	if !strings.Contains(got, wantNodeIPArg) {
 		t.Fatalf("%s rendered shell output:\n%s\nwant %s in k0s invocation", machineName, got, wantNodeIPArg)
+	}
+}
+
+func executeRenderedCrossDistroBootstrap(t *testing.T, machineName string, dialerInstallCmd string) {
+	t.Helper()
+	idx := strings.Index(dialerInstallCmd, `case "$(uname -m)" in`)
+	if idx <= 0 {
+		t.Fatalf("%s dialer-install runcmd missing uname arch switch: %s", machineName, dialerInstallCmd)
+	}
+	pkgBootstrapCmd := dialerInstallCmd[:idx]
+
+	cases := []struct {
+		name        string
+		pkgMgr      string
+		preExisting []string
+		wantSubstr  string
+		forbidSub   string
+	}{
+		{
+			name:        "debian-ubuntu-apt",
+			pkgMgr:      "apt-get",
+			preExisting: []string{"tar", "gzip", "ip"},
+			wantSubstr:  "APT_GET=install -y -q ca-certificates curl tar gzip iptables conntrack socat iproute2",
+		},
+		{
+			name:        "amazon-linux-2023-dnf-with-curl-minimal",
+			pkgMgr:      "dnf",
+			preExisting: []string{"curl", "tar", "gzip", "ip"},
+			wantSubstr:  "DNF=install -y -q ca-certificates tar gzip iptables conntrack-tools socat iproute",
+			forbidSub:   "curl",
+		},
+		{
+			name:        "rhel-yum-minimal",
+			pkgMgr:      "yum",
+			preExisting: []string{"tar", "gzip", "ip"},
+			wantSubstr:  "YUM=install -y -q ca-certificates tar gzip iptables conntrack-tools socat iproute curl",
+		},
+		{
+			name:        "sles-zypper",
+			pkgMgr:      "zypper",
+			preExisting: []string{"curl", "tar", "gzip", "ip"},
+			wantSubstr:  "ZYPPER=--non-interactive install -y ca-certificates curl tar gzip iptables conntrack-tools socat iproute2",
+		},
+	}
+
+	for _, tc := range cases {
+		binDir := t.TempDir()
+		for _, bin := range tc.preExisting {
+			p := filepath.Join(binDir, bin)
+			if err := os.WriteFile(p, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+				t.Fatalf("writing mock %s: %v", bin, err)
+			}
+		}
+		mgrScript := "#!/bin/sh\nprintf '" + strings.ToUpper(strings.ReplaceAll(tc.pkgMgr, "-", "_")) + "=%s\\n' \"$*\"\n"
+		if err := os.WriteFile(filepath.Join(binDir, tc.pkgMgr), []byte(mgrScript), 0o755); err != nil {
+			t.Fatalf("writing mock %s: %v", tc.pkgMgr, err)
+		}
+
+		cmd := exec.Command("/bin/sh", "-e", "-c", pkgBootstrapCmd)
+		cmd.Env = []string{"PATH=" + binDir}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s (%s) cross-distro bootstrap failed: %v\noutput:\n%s", machineName, tc.name, err, string(out))
+		}
+		got := string(out)
+		if !strings.Contains(got, tc.wantSubstr) {
+			t.Fatalf("%s (%s) output = %q, want substring %q", machineName, tc.name, got, tc.wantSubstr)
+		}
+		if tc.forbidSub != "" && strings.Contains(got, tc.forbidSub) {
+			t.Fatalf("%s (%s) output = %q, must not contain %q (AL2023 curl-minimal conflict)", machineName, tc.name, got, tc.forbidSub)
+		}
 	}
 }

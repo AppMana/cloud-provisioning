@@ -241,7 +241,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// bootstrap Secret is there. All that is needed here is that the
 	// infrastructureRef target object exists.
 	infraMachine := &unstructured.Unstructured{}
-	infraMachine.SetGroupVersionKind(infra.GVK())
+	infraMachine.SetGroupVersionKind(r.servedGVK(infra.GVK()))
 	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: infraRefName}, infraMachine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -576,6 +576,15 @@ func defaultCNI(infra InfraProvider) func(string) string {
 		return n.DefaultCNI
 	}
 	return nil
+}
+
+func (r *Reconciler) servedGVK(fallback schema.GroupVersionKind) schema.GroupVersionKind {
+	if r.Client != nil && r.Client.RESTMapper() != nil {
+		if mapping, err := r.Client.RESTMapper().RESTMapping(fallback.GroupKind()); err == nil && mapping.GroupVersionKind.Version != "" {
+			return mapping.GroupVersionKind
+		}
+	}
+	return fallback
 }
 
 // infraProviderFor finds the registered InfraProvider whose GVK.Kind

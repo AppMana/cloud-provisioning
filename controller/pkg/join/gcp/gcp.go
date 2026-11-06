@@ -6,25 +6,194 @@ package gcp
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Provider supplies CAPG identity and bootstrap template values. Machine shape
-// is copied from a GCPMachineTemplate by the claim reconciler.
+// Provider supplies CAPG identity, preflight validation, and GCE instance
+// defaults (publicIP, stock Ubuntu imageFamily fallback, and a startup-script
+// bridge so stock GCE Debian/RHEL images without cloud-init still execute
+// CAPG's user-data #cloud-config).
 type Provider struct{}
 
 var (
-	gvk           = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "GCPMachine"}
-	gcpClusterGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "GCPCluster"}
+	// CAPG (cluster-api-provider-gcp) serves infrastructure.cluster.x-k8s.io/v1beta1.
+	gvk           = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta1", Kind: "GCPMachine"}
+	gcpClusterGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta1", Kind: "GCPCluster"}
+	clusterGVK    = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
 )
+
+const (
+	clusterNameLabel = "cluster.x-k8s.io/cluster-name"
+	// DefaultImageFamilyAMD64 is the official GCP Ubuntu 24.04 LTS amd64 image
+	// family (includes cloud-init out of the box). Used when neither spec.image
+	// nor spec.imageFamily is set on GCPMachine so CAPG does not fall back to a
+	// non-existent project-local "capi-ubuntu-1804-k8s-*" image family.
+	DefaultImageFamilyAMD64 = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+	// DefaultImageFamilyARM64 is the official GCP Ubuntu 24.04 LTS arm64 image family.
+	DefaultImageFamilyARM64 = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-arm64"
+)
+
+// BootstrapStartupScript is injected into GCPMachine.spec.additionalMetadata
+// under key "startup-script" when not already set.
+//
+// Why this exists: CAPG injects Machine.spec.bootstrap.dataSecretName into the
+// GCE instance metadata key "user-data" (#cloud-config). Official GCP Ubuntu
+// images run cloud-init by default and consume "user-data" natively, but
+// Google's default GCE OS (debian-cloud/debian-12) and RHEL/Rocky GCE images do
+// NOT have cloud-init installed by default — they only run google-guest-agent,
+// which executes "startup-script" and ignores "user-data". This idempotent
+// bridge is a no-op when cloud-init is already present, and otherwise installs
+// cloud-init via apt-get/dnf/yum and runs it against CAPG's user-data.
+const BootstrapStartupScript = `#!/bin/sh
+set -eu
+if [ -f /run/cluster-api/bootstrap-success.complete ]; then
+  exit 0
+fi
+if command -v cloud-init >/dev/null 2>&1; then
+  exit 0
+fi
+if command -v apt-get >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get update -q
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q cloud-init
+elif command -v dnf >/dev/null 2>&1; then
+  dnf install -y -q cloud-init
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y -q cloud-init
+fi
+cloud-init init
+cloud-init modules --mode=config
+cloud-init modules --mode=final
+`
 
 // GVK implements join.InfraProvider.
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
 // ClusterGVK implements join.MachineProvisioner.
 func (Provider) ClusterGVK() schema.GroupVersionKind { return gcpClusterGVK }
+
+// PrepareInfraMachine implements join.InfraMachinePreparer for GCPMachine.
+func (Provider) PrepareInfraMachine(gcpMachine *unstructured.Unstructured) (string, error) {
+	if gcpMachine == nil {
+		return "", nil
+	}
+	var failureDomain string
+	if z, found, _ := unstructured.NestedString(gcpMachine.Object, "spec", "zone"); found && z != "" {
+		failureDomain = z
+		unstructured.RemoveNestedField(gcpMachine.Object, "spec", "zone")
+	}
+	if fd, found, _ := unstructured.NestedString(gcpMachine.Object, "spec", "failureDomain"); found && fd != "" {
+		if failureDomain == "" {
+			failureDomain = fd
+		}
+		unstructured.RemoveNestedField(gcpMachine.Object, "spec", "failureDomain")
+	}
+
+	// Default publicIP to true: on an externally-managed GCPCluster there is no
+	// CAPG-provisioned Cloud NAT, and the on-premises WireGuard dialer needs a
+	// routable ExternalIP (ONE_TO_ONE_NAT AccessConfig) on the GCE VM.
+	if _, found, _ := unstructured.NestedBool(gcpMachine.Object, "spec", "publicIP"); !found {
+		if err := unstructured.SetNestedField(gcpMachine.Object, true, "spec", "publicIP"); err != nil {
+			return "", err
+		}
+	}
+
+	// Default imageFamily to official Ubuntu 24.04 LTS if neither image nor
+	// imageFamily is specified (CAPG otherwise defaults to a custom
+	// projects/<project>/global/images/family/capi-ubuntu-1804-k8s-* family).
+	img, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "image")
+	imgFamily, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "imageFamily")
+	if strings.TrimSpace(img) == "" && strings.TrimSpace(imgFamily) == "" {
+		instType, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "instanceType")
+		defaultFamily := DefaultImageFamilyAMD64
+		if isARM64InstanceType(instType) || gcpMachine.GetLabels()["cloud-provisioning.appmana.com/arch"] == "arm64" {
+			defaultFamily = DefaultImageFamilyARM64
+		}
+		if err := unstructured.SetNestedField(gcpMachine.Object, defaultFamily, "spec", "imageFamily"); err != nil {
+			return "", err
+		}
+	}
+
+	// Ensure startup-script cloud-init bridge is present so stock Debian 12 and
+	// RHEL/Rocky GCE images (which only run google-guest-agent) install and invoke
+	// cloud-init to process CAPG's user-data #cloud-config.
+	items, _, _ := unstructured.NestedSlice(gcpMachine.Object, "spec", "additionalMetadata")
+	hasStartupScript := false
+	for _, raw := range items {
+		if m, ok := raw.(map[string]any); ok && m["key"] == "startup-script" {
+			hasStartupScript = true
+			break
+		}
+	}
+	if !hasStartupScript {
+		items = append(items, map[string]any{
+			"key":   "startup-script",
+			"value": BootstrapStartupScript,
+		})
+		if err := unstructured.SetNestedSlice(gcpMachine.Object, items, "spec", "additionalMetadata"); err != nil {
+			return "", err
+		}
+	}
+
+	return failureDomain, nil
+}
+
+func isARM64InstanceType(instanceType string) bool {
+	prefix := strings.SplitN(strings.ToLower(strings.TrimSpace(instanceType)), "-", 2)[0]
+	return prefix == "t2a" || prefix == "c4a" || prefix == "n4a" || prefix == "a4x"
+}
+
+// Validate implements join.Validator: traces a GCPMachine to its Cluster and
+// GCPCluster, and when spec.credentialsRef is set, verifies that the referenced
+// Secret exists and contains the "credentials" key required by CAPG.
+func (Provider) Validate(ctx context.Context, c client.Reader, gcpMachine *unstructured.Unstructured) error {
+	clusterName := gcpMachine.GetLabels()[clusterNameLabel]
+	if clusterName == "" {
+		return nil
+	}
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(clusterGVK)
+	if err := c.Get(ctx, client.ObjectKey{Namespace: gcpMachine.GetNamespace(), Name: clusterName}, cluster); err != nil {
+		return nil
+	}
+	infraRefKind, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "kind")
+	infraRefName, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "name")
+	if infraRefKind != "GCPCluster" || infraRefName == "" {
+		return nil
+	}
+
+	gcpCluster := &unstructured.Unstructured{}
+	gcpCluster.SetGroupVersionKind(gcpClusterGVK)
+	if err := c.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: infraRefName}, gcpCluster); err != nil {
+		// Also try v1beta2 in case a future CAPG CRD version is installed.
+		gcpCluster.SetGroupVersionKind(schema.GroupVersionKind{Group: gcpClusterGVK.Group, Version: "v1beta2", Kind: "GCPCluster"})
+		if err2 := c.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: infraRefName}, gcpCluster); err2 != nil {
+			return nil
+		}
+	}
+	secretName, _, _ := unstructured.NestedString(gcpCluster.Object, "spec", "credentialsRef", "name")
+	if secretName == "" {
+		return nil
+	}
+	secretNamespace, _, _ := unstructured.NestedString(gcpCluster.Object, "spec", "credentialsRef", "namespace")
+	if secretNamespace == "" {
+		secretNamespace = gcpCluster.GetNamespace()
+	}
+
+	secret := &corev1.Secret{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: secretNamespace, Name: secretName}, secret); err != nil {
+		return fmt.Errorf("GCPCluster %q references credentialsRef Secret %s/%s, which does not exist: %w", infraRefName, secretNamespace, secretName, err)
+	}
+	if len(secret.Data["credentials"]) == 0 && secret.StringData["credentials"] == "" {
+		return fmt.Errorf("GCPCluster %q credentialsRef Secret %s/%s is missing required key \"credentials\" (CAPG reads Secret.data[\"credentials\"])", infraRefName, secretNamespace, secretName)
+	}
+	return nil
+}
 
 // BootstrapIdentityScript discovers the immutable GCE instance identity after launch.
 // CAPG binds a Machine to a Node via gce://<project-id>/<zone>/<instance-name>.

@@ -76,7 +76,7 @@ spec:
     name: aws-ubuntu-amd64
 ---
 # --- 2. Google Cloud CAPI Cluster & MachineTemplate (CAPG) ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: GCPCluster
 metadata:
   name: site-gcp
@@ -100,7 +100,7 @@ spec:
     kind: GCPCluster
     name: site-gcp
 ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: GCPMachineTemplate
 metadata:
   name: gcp-ubuntu-amd64
@@ -113,8 +113,8 @@ spec:
         cloud-provisioning.appmana.com/arch: amd64
     spec:
       instanceType: e2-standard-4
-      image: projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64
-      publicIP: true
+      zone: us-central1-a
+      imageFamily: projects/debian-cloud/global/images/family/debian-12
 ---
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
@@ -128,7 +128,7 @@ spec:
     name: gcp-ubuntu-amd64
 ---
 # --- 3. Generic CAPI Provider Example (CAPZ AzureCluster & AzureMachineTemplate) ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: AzureCluster
 metadata:
   name: site-azure
@@ -151,7 +151,7 @@ spec:
     kind: AzureCluster
     name: site-azure
 ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: AzureMachineTemplate
 metadata:
   name: azure-ubuntu-amd64

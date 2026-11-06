@@ -142,12 +142,26 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// "change the claim" is delete-and-recreate, the same as any other
 	// CAPI spec change.
 	infraMachine := &unstructured.Unstructured{}
-	infraMachine.SetGroupVersionKind(provisioner.GVK())
+	infraMachine.SetGroupVersionKind(r.servedGVK(provisioner.GVK()))
 	err = r.Reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}, infraMachine)
 	if apierrors.IsNotFound(err) {
 		infraMachine, err = machineFromTemplate(ctx, r.Reader, r.Client.RESTMapper(), claim)
 		if err != nil {
 			return r.fail(ctx, claim, err)
+		}
+		if prep, ok := provisioner.(join.InfraMachinePreparer); ok {
+			fd, prepErr := prep.PrepareInfraMachine(infraMachine)
+			if prepErr != nil {
+				return r.fail(ctx, claim, prepErr)
+			}
+			if fd != "" {
+				anns := infraMachine.GetAnnotations()
+				if anns == nil {
+					anns = map[string]string{}
+				}
+				anns["cloud-provisioning.appmana.com/failure-domain"] = fd
+				infraMachine.SetAnnotations(anns)
+			}
 		}
 		// Admit the node class before any machine exists, so a class the
 		// platform cannot run never reaches the infrastructure provider.
@@ -205,32 +219,36 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err != nil {
 			return r.fail(ctx, claim, err)
 		}
-		machine = &unstructured.Unstructured{Object: map[string]any{
-			"spec": map[string]any{
-				"clusterName": cluster.GetName(),
-				"version":     version,
-				// Deletion has to converge. CAPI's defaults are to wait
-				// indefinitely: drain, volume detach and node deletion
-				// each block without a bound. The node these claims
-				// create is reached only through the tunnel being torn
-				// down, so it can become undrainable mid-deletion, and
-				// `kubectl delete provisionednodeclaim` would then hang
-				// with its instance still running. Bounded here so a
-				// claim deletion is a reliable teardown.
-				"deletion": map[string]any{
-					"nodeDrainTimeoutSeconds":        int64(120),
-					"nodeVolumeDetachTimeoutSeconds": int64(120),
-					"nodeDeletionTimeoutSeconds":     int64(60),
-				},
-				"bootstrap": map[string]any{
-					"dataSecretName": fmt.Sprintf(r.BootstrapSecretNameFormat, claim.Name),
-				},
-				"infrastructureRef": map[string]any{
-					"apiGroup": provisioner.GVK().Group,
-					"kind":     provisioner.GVK().Kind,
-					"name":     claim.Name,
-				},
+		machineSpec := map[string]any{
+			"clusterName": cluster.GetName(),
+			"version":     version,
+			// Deletion has to converge. CAPI's defaults are to wait
+			// indefinitely: drain, volume detach and node deletion
+			// each block without a bound. The node these claims
+			// create is reached only through the tunnel being torn
+			// down, so it can become undrainable mid-deletion, and
+			// `kubectl delete provisionednodeclaim` would then hang
+			// with its instance still running. Bounded here so a
+			// claim deletion is a reliable teardown.
+			"deletion": map[string]any{
+				"nodeDrainTimeoutSeconds":        int64(120),
+				"nodeVolumeDetachTimeoutSeconds": int64(120),
+				"nodeDeletionTimeoutSeconds":     int64(60),
 			},
+			"bootstrap": map[string]any{
+				"dataSecretName": fmt.Sprintf(r.BootstrapSecretNameFormat, claim.Name),
+			},
+			"infrastructureRef": map[string]any{
+				"apiGroup": provisioner.GVK().Group,
+				"kind":     provisioner.GVK().Kind,
+				"name":     claim.Name,
+			},
+		}
+		if fd := infraMachine.GetAnnotations()["cloud-provisioning.appmana.com/failure-domain"]; fd != "" {
+			machineSpec["failureDomain"] = fd
+		}
+		machine = &unstructured.Unstructured{Object: map[string]any{
+			"spec": machineSpec,
 		}}
 		machine.SetGroupVersionKind(machineGVK)
 		machine.SetName(claim.Name)
@@ -566,7 +584,9 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 		external := clusterExternal || infra.GetAnnotations()[managedByAnnotation] == "external"
 		ready, _, _ := unstructured.NestedBool(infra.Object, "status", "ready")
 		provisioned, _, _ := unstructured.NestedBool(infra.Object, "status", "initialization", "provisioned")
-		if external && (!ready || !provisioned) {
+		fds, _, _ := unstructured.NestedMap(infra.Object, "status", "failureDomains")
+		wantFDs := externalGCPFailureDomains(infraKind, infra.Object, fds)
+		if external && (!ready || !provisioned || wantFDs != nil) {
 			// Both contracts: v1beta1 reads status.ready, v1beta2 reads
 			// status.initialization.provisioned, and a provider's schema
 			// prunes whichever it does not declare.
@@ -576,6 +596,11 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 			}
 			if err := unstructured.SetNestedField(patched.Object, true, "status", "initialization", "provisioned"); err != nil {
 				return err
+			}
+			if wantFDs != nil {
+				if err := unstructured.SetNestedMap(patched.Object, wantFDs, "status", "failureDomains"); err != nil {
+					return err
+				}
 			}
 			if err := r.Status().Patch(ctx, patched, client.MergeFrom(infra)); err != nil {
 				return fmt.Errorf("marking %s %q ready: %w", infraKind, infraName, err)
@@ -600,6 +625,43 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 		return fmt.Errorf("marking Cluster %q provisioned: %w", cluster.GetName(), err)
 	}
 	return nil
+}
+
+// externalGCPFailureDomains ensures an externally-managed GCPCluster carries
+// at least one failureDomain in status.failureDomains when none is present yet.
+// CAPG's MachineScope.Zone() reads Machine.spec.failureDomain or
+// GCPCluster.status.failureDomains; when GCPCluster is managed-by: external,
+// CAPG's GCPClusterReconciler stands down and never populates status.failureDomains.
+func externalGCPFailureDomains(infraKind string, obj map[string]any, existing map[string]any) map[string]any {
+	if infraKind != "GCPCluster" || len(existing) > 0 {
+		return nil
+	}
+	out := map[string]any{}
+	if specFDs, found, _ := unstructured.NestedStringSlice(obj, "spec", "failureDomains"); found {
+		for _, fd := range specFDs {
+			if strings.TrimSpace(fd) != "" {
+				out[strings.TrimSpace(fd)] = map[string]any{"controlPlane": false}
+			}
+		}
+	}
+	if len(out) == 0 {
+		if region, _, _ := unstructured.NestedString(obj, "spec", "region"); strings.TrimSpace(region) != "" {
+			out[strings.TrimSpace(region)+"-a"] = map[string]any{"controlPlane": false}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func (r *Reconciler) servedGVK(fallback schema.GroupVersionKind) schema.GroupVersionKind {
+	if r.Client != nil && r.Client.RESTMapper() != nil {
+		if mapping, err := r.Client.RESTMapper().RESTMapping(fallback.GroupKind()); err == nil && mapping.GroupVersionKind.Version != "" {
+			return mapping.GroupVersionKind
+		}
+	}
+	return fallback
 }
 
 // clusterKubernetesVersion reads the running version off any existing

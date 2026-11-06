@@ -70,7 +70,15 @@ runcmd:
 {{- template "dialer-install" . }}
   - |
     set -e
-    command -v snap >/dev/null || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y snapd)
+    if ! command -v snap >/dev/null 2>&1; then
+      if command -v apt-get >/dev/null 2>&1; then
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y snapd
+      elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y snapd && systemctl enable --now snapd.socket
+      elif command -v yum >/dev/null 2>&1; then
+        yum install -y snapd && systemctl enable --now snapd.socket
+      fi
+    fi
 {{- template "provider-id-arg" . }}
     # MicroK8s reaches kubelets directly. A cloud's private NIC address can
     # be unreachable or overlap another cloud; advertise the allocated tunnel

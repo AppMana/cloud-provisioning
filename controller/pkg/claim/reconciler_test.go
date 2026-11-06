@@ -2,8 +2,10 @@ package claim
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,12 +15,14 @@ import (
 	"sigs.k8s.io/yaml"
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"github.com/appmana/cloud-provisioning/controller/pkg/bootstrap"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joingcp "github.com/appmana/cloud-provisioning/controller/pkg/join/gcp"
 	joingeneric "github.com/appmana/cloud-provisioning/controller/pkg/join/generic"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -54,7 +58,7 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	scheme.AddKnownTypeWithName(clusterListGVK, &unstructured.UnstructuredList{})
 	awsMachineGVK := joinaws.Provider{}.GVK()
 	for _, kind := range []string{
-		"AWSMachine", "AWSMachineTemplate", "AWSCluster",
+		"AWSMachine", "AWSMachineTemplate", "AWSCluster", "AWSClusterStaticIdentity", "AWSClusterRoleIdentity",
 		"GCPMachine", "GCPMachineTemplate", "GCPCluster",
 		"AzureMachine", "AzureMachineTemplate", "AzureCluster",
 		"DockerMachine", "DockerMachineTemplate",
@@ -923,6 +927,25 @@ func TestReconcile_MultiCAPI_AWSAndGCPInSameNamespace(t *testing.T) {
 	}
 }
 
+type staticJoinProvider struct{}
+
+func (staticJoinProvider) JoinValues(_ context.Context) (map[string]any, error) {
+	return map[string]any{
+		"apiEndpoint": "10.96.0.1:6443",
+		"joinToken":   "test-k0s-join-token",
+		"k0sVersion":  "v1.34.0+k0s.0",
+	}, nil
+}
+
+type cloudConfigDoc struct {
+	WriteFiles []struct {
+		Path     string `json:"path"`
+		Encoding string `json:"encoding"`
+		Content  string `json:"content"`
+	} `json:"write_files"`
+	RunCmd []string `json:"runcmd"`
+}
+
 func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "examples", "mixed-cloud-workers.yaml"))
 	if err != nil {
@@ -950,7 +973,15 @@ func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
 		}
 		initObjects = append(initObjects, &u)
 	}
-	initObjects = append(initObjects, awsConfigSecret(), fakeNode())
+	peerSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "tunnel-peers", Namespace: "cloud-provisioning"},
+		Data: map[string][]byte{
+			"node-public-key-onprem-0":     []byte("c3BhcmsyYWIzLXB1YmxpYy1rZXktdGVzdC1vbmx5PT0="),
+			"node-tunnel-address-onprem-0": []byte("10.100.0.1/24"),
+			"node-addresses-onprem-0":      []byte("192.0.2.10"),
+		},
+	}
+	initObjects = append(initObjects, awsConfigSecret(), fakeNode(), peerSecret)
 
 	r := newClaimReconciler(t, initObjects...)
 	r.Provisioners = append(r.Provisioners, joingcp.Provider{}, joingeneric.Provider{})
@@ -964,16 +995,85 @@ func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
 		}
 	}
 
+	joinReconciler := &join.Reconciler{
+		Client: r.Client,
+		Reader: r.Reader,
+		Join:   staticJoinProvider{},
+		InfraProviders: []join.InfraProvider{
+			joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config"},
+			joingcp.Provider{},
+			joingeneric.Provider{},
+		},
+		BootstrapRenderers: map[string]join.BootstrapRenderer{
+			"linux": join.PatternBootstrap{
+				Path:   filepath.Join("..", "..", "..", "join-patterns", "k0s-worker.cloud-config.tmpl"),
+				Format: bootstrap.CloudConfig,
+			},
+		},
+		APIVIP:                    "10.96.0.1",
+		WireGuardAddress:          "10.100.0.2/24",
+		WireGuardListenPort:       "51820",
+		DialerPeerSecretNamespace: "cloud-provisioning",
+		DialerPeerSecretName:      "tunnel-peers",
+		DialerListenPort:          "51820",
+		InterfaceName:             "cldt0",
+		DialerBinaryURLARM64:      "https://example.invalid/wg-dialer-arm64",
+		DialerBinarySHA256ARM64:   "1111111111111111111111111111111111111111111111111111111111111111",
+		DialerBinaryURLAMD64:      "https://example.invalid/wg-dialer-amd64",
+		DialerBinarySHA256AMD64:   "2222222222222222222222222222222222222222222222222222222222222222",
+		CNIPluginsURLARM64:        "https://example.invalid/cni-arm64.tgz",
+		CNIPluginsSHA256ARM64:     "3333333333333333333333333333333333333333333333333333333333333333",
+		CNIPluginsURLAMD64:        "https://example.invalid/cni-amd64.tgz",
+		CNIPluginsSHA256AMD64:     "4444444444444444444444444444444444444444444444444444444444444444",
+		BootstrapSecretNameFormat: "%s-bootstrap",
+	}
+
+	orderedNames := []string{"aws-worker-1", "aws-worker-2", "gcp-worker-1", "azure-worker-1"}
 	wantMachines := map[string]struct {
 		clusterName string
 		infraKind   string
+		tunnelAddr  string
+		cloud       string
+		wantID      string
+		wantNodeIP  string
 	}{
-		"aws-worker-1":   {clusterName: "site-aws", infraKind: "AWSMachine"},
-		"aws-worker-2":   {clusterName: "site-aws", infraKind: "AWSMachine"},
-		"gcp-worker-1":   {clusterName: "site-gcp", infraKind: "GCPMachine"},
-		"azure-worker-1": {clusterName: "site-azure", infraKind: "AzureMachine"},
+		"aws-worker-1": {
+			clusterName: "site-aws",
+			infraKind:   "AWSMachine",
+			tunnelAddr:  "10.100.0.2/24",
+			cloud:       "aws",
+			wantID:      "--provider-id=aws:///us-west-2a/i-0123456789abcdef0",
+			wantNodeIP:  "--node-ip=10.0.1.10,2600:1f14::10",
+		},
+		"aws-worker-2": {
+			clusterName: "site-aws",
+			infraKind:   "AWSMachine",
+			tunnelAddr:  "10.100.0.3/24",
+			cloud:       "aws",
+			wantID:      "--provider-id=aws:///us-west-2a/i-0123456789abcdef0",
+			wantNodeIP:  "--node-ip=10.0.1.10,2600:1f14::10",
+		},
+		"gcp-worker-1": {
+			clusterName: "site-gcp",
+			infraKind:   "GCPMachine",
+			tunnelAddr:  "10.100.0.4/24",
+			cloud:       "gcp",
+			wantID:      "--provider-id=gce://my-gcp-project/us-central1-a/gcp-worker-1",
+			wantNodeIP:  "--node-ip=10.128.0.5",
+		},
+		"azure-worker-1": {
+			clusterName: "site-azure",
+			infraKind:   "AzureMachine",
+			tunnelAddr:  "10.100.0.5/24",
+			cloud:       "azure",
+			wantID:      "--provider-id=azure:///subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/azure-worker-1",
+			wantNodeIP:  "--node-ip=10.2.0.4",
+		},
 	}
-	for name, want := range wantMachines {
+
+	seenPrivateKeys := map[string]string{}
+	for _, name := range orderedNames {
+		want := wantMachines[name]
 		m := &unstructured.Unstructured{}
 		m.SetGroupVersionKind(machineGVK)
 		if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: name}, m); err != nil {
@@ -985,5 +1085,195 @@ func TestExamplesMixedCloudWorkersManifest(t *testing.T) {
 		if got, _, _ := unstructured.NestedString(m.Object, "spec", "infrastructureRef", "kind"); got != want.infraKind {
 			t.Fatalf("%s infrastructureRef.kind = %q, want %q", name, got, want.infraKind)
 		}
+
+		if m.GetUID() == "" {
+			m.SetUID(types.UID("machine-" + name))
+			if err := r.Update(context.Background(), m); err != nil {
+				t.Fatalf("setting UID on Machine %s: %v", name, err)
+			}
+		}
+
+		// Run join.Reconciler to render the #cloud-config bootstrap Secret and register the WireGuard peer.
+		if _, err := joinReconciler.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Namespace: "cloud-provisioning", Name: name},
+		}); err != nil {
+			t.Fatalf("join.Reconcile(%s): %v", name, err)
+		}
+
+		bootstrapSecret := &corev1.Secret{}
+		if err := r.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: name + "-bootstrap"}, bootstrapSecret); err != nil {
+			t.Fatalf("expected bootstrap Secret %s-bootstrap: %v", name, err)
+		}
+		format := string(bootstrapSecret.Data["format"])
+		if format == "" {
+			format = bootstrapSecret.StringData["format"]
+		}
+		if format != bootstrap.CloudConfig {
+			t.Fatalf("%s-bootstrap format = %q, want %q", name, format, bootstrap.CloudConfig)
+		}
+		userdata := string(bootstrapSecret.Data["value"])
+		if userdata == "" {
+			userdata = bootstrapSecret.StringData["value"]
+		}
+		if !strings.HasPrefix(userdata, "#cloud-config\n") {
+			t.Fatalf("%s-bootstrap does not start with #cloud-config", name)
+		}
+
+		var doc cloudConfigDoc
+		if err := yaml.Unmarshal([]byte(userdata), &doc); err != nil {
+			t.Fatalf("unmarshaling %s-bootstrap cloud-config YAML: %v", name, err)
+		}
+
+		filesByPath := map[string]string{}
+		for _, wf := range doc.WriteFiles {
+			content := wf.Content
+			if wf.Encoding == "b64" {
+				decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(wf.Content))
+				if err != nil {
+					t.Fatalf("%s-bootstrap decoding b64 file %s: %v", name, wf.Path, err)
+				}
+				content = string(decoded)
+			}
+			filesByPath[wf.Path] = content
+		}
+
+		if gotName := strings.TrimSpace(filesByPath["/etc/wg-dialer/machine-name"]); gotName != name {
+			t.Fatalf("%s /etc/wg-dialer/machine-name = %q, want %q", name, gotName, name)
+		}
+
+		var peersDoc tunnel.PeersFileDoc
+		if err := json.Unmarshal([]byte(filesByPath["/etc/wg-dialer/peers.json"]), &peersDoc); err != nil {
+			t.Fatalf("%s unmarshaling /etc/wg-dialer/peers.json: %v", name, err)
+		}
+		if peersDoc.LocalAddress != want.tunnelAddr {
+			t.Fatalf("%s peers.json LocalAddress = %q, want %q", name, peersDoc.LocalAddress, want.tunnelAddr)
+		}
+		if peersDoc.PrivateKey == "" {
+			t.Fatalf("%s peers.json PrivateKey is empty", name)
+		}
+		if prevMachine, dup := seenPrivateKeys[peersDoc.PrivateKey]; dup {
+			t.Fatalf("%s reused WireGuard PrivateKey from %s", name, prevMachine)
+		}
+		seenPrivateKeys[peersDoc.PrivateKey] = name
+
+		// Execute the rendered cloud-provider-identity script and the rendered
+		// runcmd identity/node-IP discovery block in sh -e against simulated
+		// cloud metadata endpoints to verify real guest execution.
+		executeRenderedCloudInitDiscovery(t, name, want.cloud, filesByPath["/usr/local/bin/cloud-provider-identity"], doc.RunCmd, want.wantID, want.wantNodeIP)
+	}
+}
+
+func executeRenderedCloudInitDiscovery(
+	t *testing.T,
+	machineName string,
+	cloud string,
+	identityScript string,
+	runcmds []string,
+	wantProviderIDArg string,
+	wantNodeIPArg string,
+) {
+	t.Helper()
+	if identityScript == "" {
+		t.Fatalf("%s missing /usr/local/bin/cloud-provider-identity in write_files", machineName)
+	}
+	var joinCmd string
+	for _, cmd := range runcmds {
+		if strings.Contains(cmd, "PROVIDER_ID_ARG=") && strings.Contains(cmd, "NODE_IP_ARG=") {
+			joinCmd = cmd
+			break
+		}
+	}
+	if joinCmd == "" {
+		t.Fatalf("%s missing runcmd containing PROVIDER_ID_ARG and NODE_IP_ARG", machineName)
+	}
+	tmpDir := t.TempDir()
+	idPath := filepath.Join(tmpDir, "cloud-provider-identity")
+	if err := os.WriteFile(idPath, []byte(identityScript), 0o755); err != nil {
+		t.Fatalf("writing cloud-provider-identity: %v", err)
+	}
+	discoveryShell := strings.ReplaceAll(joinCmd, "/usr/local/bin/cloud-provider-identity", idPath)
+
+	mockK0s := filepath.Join(tmpDir, "k0s")
+	k0sScript := "#!/bin/sh\nprintf 'K0S_INVOCATION=%s\\n' \"$*\"\n"
+	if err := os.WriteFile(mockK0s, []byte(k0sScript), 0o755); err != nil {
+		t.Fatalf("writing mock k0s: %v", err)
+	}
+
+	mockCurl := filepath.Join(tmpDir, "curl")
+	curlScript := `#!/bin/sh
+url=""
+for arg; do
+  case "$arg" in
+    http://*|https://*) url="$arg" ;;
+  esac
+done
+case "$CLOUD_SIM:$url" in
+  aws:http://169.254.169.254/latest/api/token)
+    printf 'aws-imds-token'
+    exit 0
+    ;;
+  aws:http://169.254.169.254/latest/meta-data/placement/availability-zone)
+    printf 'us-west-2a'
+    exit 0
+    ;;
+  aws:http://169.254.169.254/latest/meta-data/instance-id)
+    printf 'i-0123456789abcdef0'
+    exit 0
+    ;;
+  aws:http://169.254.169.254/latest/meta-data/local-ipv4)
+    printf '10.0.1.10'
+    exit 0
+    ;;
+  aws:http://169.254.169.254/latest/meta-data/ipv6)
+    printf '2600:1f14::10'
+    exit 0
+    ;;
+  gcp:http://metadata.google.internal/computeMetadata/v1/project/project-id)
+    printf 'my-gcp-project'
+    exit 0
+    ;;
+  gcp:http://metadata.google.internal/computeMetadata/v1/instance/zone)
+    printf 'projects/123456/zones/us-central1-a'
+    exit 0
+    ;;
+  gcp:http://metadata.google.internal/computeMetadata/v1/instance/name)
+    printf 'gcp-worker-1'
+    exit 0
+    ;;
+  gcp:http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
+    printf '10.128.0.5'
+    exit 0
+    ;;
+  azure:http://169.254.169.254/metadata/instance/compute/resourceId*)
+    printf '/subscriptions/sub-1/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/azure-worker-1'
+    exit 0
+    ;;
+  azure:http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress*)
+    printf '10.2.0.4'
+    exit 0
+    ;;
+esac
+exit 22
+`
+	if err := os.WriteFile(mockCurl, []byte(curlScript), 0o755); err != nil {
+		t.Fatalf("writing mock curl: %v", err)
+	}
+
+	cmd := exec.Command("sh", "-e", "-c", discoveryShell)
+	cmd.Env = append(os.Environ(),
+		"PATH="+tmpDir+":"+os.Getenv("PATH"),
+		"CLOUD_SIM="+cloud,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s executing rendered cloud-config discovery shell in sh -e failed: %v\noutput:\n%s\nshell:\n%s",
+			machineName, err, string(out), discoveryShell)
+	}
+	got := string(out)
+	if !strings.Contains(got, wantProviderIDArg) {
+		t.Fatalf("%s rendered shell output:\n%s\nwant %s in k0s invocation", machineName, got, wantProviderIDArg)
+	}
+	if !strings.Contains(got, wantNodeIPArg) {
+		t.Fatalf("%s rendered shell output:\n%s\nwant %s in k0s invocation", machineName, got, wantNodeIPArg)
 	}
 }

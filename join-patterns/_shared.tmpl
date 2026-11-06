@@ -181,13 +181,15 @@ identity helper during bootstrap. */}}
 {{- if .providerID }}
     PROVIDER_ID_ARG="--provider-id={{ .providerID }}"
 {{- else if index . "providerIdentityScript" }}
-    PROVIDER_ID_ARG="--provider-id=$(/usr/local/bin/cloud-provider-identity)"
+    PROVIDER_ID_VAL="$(/usr/local/bin/cloud-provider-identity)"
+    [ -n "$PROVIDER_ID_VAL" ] && PROVIDER_ID_ARG="--provider-id=$PROVIDER_ID_VAL"
 {{- end }}
 {{- end }}
 {{/* The physical-address policy is used by distributions that select it.
-Prefer the provider's known address, otherwise try bounded EC2 IMDSv2 lookups.
-An empty result leaves address selection to the distribution. MicroK8s instead
-uses its allocated tunnel address so control planes can reach its kubelet. */}}
+Prefer the provider's known address, otherwise try bounded cloud metadata
+lookups (AWS EC2 IMDSv2, GCP GCE metadata, Azure IMDS). An empty result leaves
+address selection to the distribution. MicroK8s instead uses its allocated
+tunnel address so control planes can reach its kubelet. */}}
 {{- define "node-ip-arg" }}
 {{- template "provider-id-arg" . }}
     NODE_IP_ARG=""
@@ -200,6 +202,12 @@ uses its allocated tunnel address so control planes can reach its kubelet. */}}
       NODE_IPV6=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
       [ -n "$NODE_IPV4" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4"
       [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    elif GCE_IPV4=$(curl -sf -m 2 -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip" || true) && [ -n "$GCE_IPV4" ]; then
+      GCE_IPV6=$(curl -sf -m 2 -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ipv6s" | head -n 1 || true)
+      NODE_IP_ARG="--node-ip=$GCE_IPV4"
+      [ -n "$GCE_IPV6" ] && NODE_IP_ARG="--node-ip=$GCE_IPV4,$GCE_IPV6"
+    elif AZ_IPV4=$(curl -sf -m 2 -H "Metadata: true" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text" || true) && [ -n "$AZ_IPV4" ]; then
+      NODE_IP_ARG="--node-ip=$AZ_IPV4"
     fi
 {{- end }}
 {{- end }}

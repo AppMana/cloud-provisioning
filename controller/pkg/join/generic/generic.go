@@ -213,7 +213,7 @@ if os_meta=$(curl -fsS --connect-timeout 2 --max-time 4 "http://169.254.169.254/
     exit 0
   fi
 fi
-exit 1
+exit 0
 `
 
 // BootstrapIdentityPowerShell discovers the instance's CAPI providerID on Windows

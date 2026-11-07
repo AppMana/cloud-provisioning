@@ -162,7 +162,7 @@ spec:
             - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             - "--dialer-image-pull-policy={{ .Values.dialerImage.pullPolicy }}"
-            - "--join-provider={{ .Values.joinProvider }}"
+            - "--join-provider={{ .Values.joinProvider | default "auto" }}"
             - "--site-cni-exclusion={{ .Values.siteCNI.exclusion }}"
             {{- with .Values.siteCNI.daemonSets }}
             - {{ printf "--site-cni-daemonsets=%s" (join "," .) | quote }}
@@ -180,7 +180,9 @@ spec:
             {{- with .Values.joinKubeletExtraFlags }}
             - {{ printf "--join-kubelet-extra-flags=%s" . | quote }}
             {{- end }}
+            {{- if and .Values.joinProvider (ne .Values.joinProvider "auto") }}
             - "--join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl"
+            {{- end }}
             {{- with .Values.cluster.apiAddress }}
             - "--join-api-address={{ . }}"
             {{- end }}

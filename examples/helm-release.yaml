@@ -25,7 +25,8 @@ spec:
     kind: OCIRepository
     name: cloud-provisioning
   values:
-    joinProvider: k0s
+    # joinProvider (k0s, k3s, rke2, microk8s, kubeadm), site CNI, and API address
+    # are inferred automatically from the cluster at startup.
     tunnel:
       # "all" (the default) places the tunnel on every on-premises Linux node
       # alongside all remote cloud workers (full mesh).

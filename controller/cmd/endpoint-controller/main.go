@@ -630,8 +630,8 @@ func main() {
 	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "tunnel-dialer-remote", "name of the remote-side dialer DaemonSet this operator provisions directly")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", true, "enable bootstrap-secret provisioning (join.Reconciler) and claim expansion: the whole point of this operator; disable only for an endpoint-mirror-only deployment")
-	flag.StringVar(&joinProviderName, "join-provider", "k0s", "which cluster technology's join specialization mints join credentials (k0s, kubeadm, k3s, rke2, microk8s); pair with the matching --join-template-path")
-	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
+	flag.StringVar(&joinProviderName, "join-provider", "auto", "which cluster technology's join specialization mints join credentials (auto, k0s, kubeadm, k3s, rke2, microk8s); 'auto' detects from the cluster at startup")
+	flag.StringVar(&joinTemplatePath, "join-template-path", "", "path to the join-pattern template to render (defaults to /join-patterns/<join-provider>-worker.cloud-config.tmpl)")
 	flag.StringVar(&joinAPIAddress, "join-api-address", "", "REQUIRED cluster API server address used to mint join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
 	flag.StringVar(&joinAPIVIP, "join-api-vip", "", "REQUIRED cluster API VIP the new node must reach through the tunnel before joining")
 	flag.IntVar(&joinAPIProxyPort, "join-api-proxy-port", 7445, "port of the loopback API balancer the remote's dialer serves; the join gates on it and kubelet keeps dialing it")
@@ -847,7 +847,7 @@ func main() {
 				joinProviderName = "k0s"
 			}
 		}
-		if !explicitFlags["join-template-path"] {
+		if !explicitFlags["join-template-path"] || joinTemplatePath == "" {
 			joinTemplatePath = fmt.Sprintf("/join-patterns/%s-worker.cloud-config.tmpl", joinProviderName)
 		}
 		network, err = cni.Detect(ctx, discoveryClient)

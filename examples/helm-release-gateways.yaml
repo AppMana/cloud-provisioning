@@ -15,7 +15,6 @@ spec:
     kind: OCIRepository
     name: cloud-provisioning
   values:
-    joinProvider: k0s
     tunnel:
       endpoints:
         matchLabels:

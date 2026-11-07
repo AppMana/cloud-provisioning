@@ -218,8 +218,10 @@ transit:
   bgpASN: 64512
 
 # Which cluster technology mints join credentials
-# (k0s | kubeadm | k3s | rke2 | microk8s).
-joinProvider: k0s
+# (auto | k0s | kubeadm | k3s | rke2 | microk8s).
+# Defaults to "auto": inferred automatically at startup from the cluster's
+# existing Nodes and kube-system ConfigMaps via discover.Distro.
+joinProvider: "auto"
 
 # With joinProvider microk8s, the chart runs a token agent on one MicroK8s
 # control plane that mints the cluster agent's join tokens and keeps Secret

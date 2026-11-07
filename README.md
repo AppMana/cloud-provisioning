@@ -35,7 +35,8 @@ spec:
     kind: OCIRepository
     name: cloud-provisioning
   values:
-    joinProvider: k0s # k0s | kubeadm | k3s | rke2 | microk8s
+    # joinProvider (k0s, k3s, rke2, microk8s, kubeadm), site CNI, and API address
+    # are inferred automatically from the cluster at startup.
 
     # Enable ProvisionedNodeGroupClaim (ReplicaSet of cloud nodes):
     experimentalNodeGroups: true

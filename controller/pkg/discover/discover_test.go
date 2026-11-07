@@ -187,3 +187,49 @@ func TestClusterDNSIsNotGuessed(t *testing.T) {
 		t.Fatal("a domain from a Corefile that serves no cluster zone")
 	}
 }
+
+func TestDistroAutoDetection(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name string
+		objs []client.Object
+		want string
+	}{
+		{
+			name: "k0s via kubeletVersion",
+			objs: []client.Object{&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cp-1"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.36.2+k0s"}}}},
+			want: "k0s",
+		},
+		{
+			name: "k3s via kubeletVersion",
+			objs: []client.Object{&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cp-1"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.34.1+k3s1"}}}},
+			want: "k3s",
+		},
+		{
+			name: "rke2 via kubeletVersion",
+			objs: []client.Object{&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cp-1"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.34.1+rke2r1"}}}},
+			want: "rke2",
+		},
+		{
+			name: "microk8s via controlplane label",
+			objs: []client.Object{&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cp-1", Labels: map[string]string{"node.kubernetes.io/microk8s-controlplane": "microk8s-controlplane"}}}},
+			want: "microk8s",
+		},
+		{
+			name: "kubeadm via kube-system/kubeadm-config ConfigMap",
+			objs: []client.Object{
+				&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cp-1"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.34.0"}}},
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "kubeadm-config", Namespace: "kube-system"}},
+			},
+			want: "kubeadm",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := Distro(ctx, newClient(tc.objs...))
+			if err != nil || got != tc.want {
+				t.Fatalf("Distro() = %q, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+}

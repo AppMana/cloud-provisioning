@@ -35,6 +35,15 @@ spec:
       endpoints: "all"
     webhook:
       aws:
-        # Optional: security group name or ID allowing inbound UDP 51820 from
-        # on-premises; automatically patched into every AWSMachineTemplate/AWSMachine.
-        securityGroupName: "cloud-provisioning-tunnel"
+        # Optional: default AWSClusterStaticIdentity / AWSClusterRoleIdentity name
+        # patched onto AWSClusters when spec.identityRef is omitted.
+        # (Security groups and VPC/subnet selection are resolved and created
+        # automatically in the target VPC by the controller.)
+        identityName: "site-aws-identity"
+    aws:
+      credentials:
+        # Secret in `cloud-provisioning` holding least-privilege runtime controller
+        # credentials (see `docs/iam/controller.json`) for VPC/subnet discovery,
+        # automatic security group lifecycle (`cloud-provisioning-<cluster>`), and
+        # native AWS VPC CNI pod IP observation.
+        secretName: "aws-controller-credentials"

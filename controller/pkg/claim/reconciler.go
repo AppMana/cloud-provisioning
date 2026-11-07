@@ -190,6 +190,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		labels[clusterNameLabel] = cluster.GetName()
 		infraMachine.SetLabels(labels)
 		infraMachine.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+		if netProv, ok := provisioner.(join.ClusterNetworkProvisioner); ok {
+			if err := netProv.EnsureMachineNetwork(ctx, r.Client, r.Reader, cluster, infraMachine); err != nil {
+				return r.fail(ctx, claim, err)
+			}
+		}
 		if v, ok := provisioner.(join.ClassValidator); ok {
 			if err := v.ValidateClass(ctx, r.Reader, infraMachine, class); err != nil {
 				return r.fail(ctx, claim, err)
@@ -377,6 +382,9 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 	if err := r.deleteClaimedNodes(ctx, claim); err != nil {
 		return ctrl.Result{}, err
 	}
+	if err := r.cleanupClusterNetworkIfUnused(ctx, claim); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	if containsString(claim.Finalizers, Finalizer) {
 		updated := claim.DeepCopy()
@@ -446,6 +454,54 @@ func (r *Reconciler) deleteClaimedNodes(ctx context.Context, claim *v1alpha1.Pro
 		ctrl.LoggerFrom(ctx).Info("removed node for claim teardown", "node", node.Name)
 	}
 	return nil
+}
+
+// cleanupClusterNetworkIfUnused invokes the provider's CleanupClusterNetwork
+// when the last ProvisionedNodeClaim and Machine for the claim's Cluster have
+// been deleted, tearing down controller-provisioned cloud network resources
+// (such as the cluster's WireGuard + pod-mesh security group) when unused.
+func (r *Reconciler) cleanupClusterNetworkIfUnused(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim) error {
+	cluster, err := r.resolveCluster(ctx, claim)
+	if err != nil || cluster == nil {
+		return nil
+	}
+	provisioner := r.provisionerForCluster(cluster, claim)
+	netProv, ok := provisioner.(join.ClusterNetworkProvisioner)
+	if !ok {
+		return nil
+	}
+	claims := &v1alpha1.ProvisionedNodeClaimList{}
+	if err := r.Reader.List(ctx, claims, client.InNamespace(claim.Namespace)); err != nil {
+		return fmt.Errorf("listing claims during network teardown check: %w", err)
+	}
+	for i := range claims.Items {
+		other := &claims.Items[i]
+		if other.Name == claim.Name || !other.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if otherCluster, err := r.resolveCluster(ctx, other); err == nil && otherCluster != nil && otherCluster.GetName() == cluster.GetName() {
+			return nil
+		}
+	}
+	machines := &unstructured.UnstructuredList{}
+	machines.SetGroupVersionKind(machineListGVK)
+	if err := r.Reader.List(ctx, machines, client.InNamespace(claim.Namespace)); err != nil && !isMissingKind(err) {
+		return fmt.Errorf("listing machines during network teardown check: %w", err)
+	}
+	for i := range machines.Items {
+		m := &machines.Items[i]
+		if m.GetName() == claim.Name {
+			continue
+		}
+		mc, _, _ := unstructured.NestedString(m.Object, "spec", "clusterName")
+		if mc == "" {
+			mc = m.GetLabels()[clusterNameLabel]
+		}
+		if mc == cluster.GetName() {
+			return nil
+		}
+	}
+	return netProv.CleanupClusterNetwork(ctx, r.Client, r.Reader, cluster)
 }
 
 // hold records what a claim waits for and looks again shortly.

@@ -6,6 +6,21 @@ cluster over WireGuard by applying a single Kubernetes resource:
 - **`ProvisionedNodeGroupClaim`** (`pngc`): maintains a ReplicaSet of cloud
   worker nodes (`spec.replicas`), supporting `kubectl scale`, HPA, and KEDA.
 
+## Supported Configurations
+
+| Distro | Site CNI | Worker OS / Arch | Cloud CNI | AWS | GCP | Generic CAPI | Labcontainers |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: |
+| `k0s` | `calico,bgp` | Linux (`amd64`, `arm64`) | `site` | ☑ |  |  | ☑ |
+| `k0s` | `calico,bgp` | Linux (`amd64`, `arm64`) | `aws-vpc` | ☑ |  |  |  |
+| `k0s` | `calico,bgp` | Windows (`amd64`) | `site` | ☑ |  |  |  |
+| `k0s` | `calico,bgp` | Windows (`amd64`) | `aws-vpc` | ☑ |  |  |  |
+| `k0s` | `calico,vxlan` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
+| `k0s` | `kube-router` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
+| `k3s` | `flannel` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
+| `rke2` | `canal` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
+| `microk8s` | `calico` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
+| `kubeadm` | `calico,bgp` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
+
 ## 1. Install (`HelmRelease`)
 
 [`examples/helm-release.yaml`](examples/helm-release.yaml) (full mesh) and
@@ -53,43 +68,101 @@ spec:
     tunnel:
       endpoints: "all"
 
-    # Mutating admission webhook: automatically patches the WireGuard security
-    # group (allowing inbound UDP 51820 from on-premises), Ubuntu 24.04 LTS AMI
-    # lookup, IAM instance profile, `publicIP: true`, and `managed-by: external`
-    # into MachineTemplates, Clusters, and Claims so manifests need no stand-in IDs.
+    # Mutating admission webhook: automatically defaults Ubuntu 24.04 LTS AMI
+    # lookup, IAM instance profile (`nodes.cluster-api-provider-aws.sigs.k8s.io`),
+    # `publicIP: true`, and `cluster.x-k8s.io/managed-by: external` on
+    # MachineTemplates, Clusters, and Claims.
     webhook:
       aws:
-        securityGroupName: "cloud-provisioning-tunnel" # or securityGroupID: "sg-..."
         identityName: "site-aws-identity"
 
-    # Optional: allow preflight checks to verify CAPI provider Secrets in their
-    # manager namespaces (e.g. CAPA in capa-system, CAPG in capg-system):
+    # Allow preflight checks to verify CAPI provider Secrets in their manager
+    # namespaces (e.g. CAPA in capa-system, CAPG in capg-system):
     providerManagerNamespaces:
       - capa-system
       - capg-system
 
-    # Optional: AWS credentials Secret in `cloud-provisioning` used by the
-    # controller itself (for preflight SG checks, s3:// URL signing, and native
-    # AWS VPC CNI pod IP observation). Separate from CAPA's Secret in `capa-system`.
+    # AWS credentials Secret in `cloud-provisioning` used by the less-privileged
+    # runtime endpoint-controller (for automatic VPC/subnet discovery, automatic
+    # creation & teardown of the cluster's WireGuard/pod-mesh security group,
+    # and native AWS VPC CNI pod IP observation).
     aws:
       credentials:
-        secretName: "" # Secret with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+        secretName: "aws-controller-credentials" # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
 ```
 
-## 2. Add Cloud Nodes (`ProvisionedNodeClaim` & `ProvisionedNodeGroupClaim`)
+## 2. One-Time AWS IAM & Network Setup
+
+Runtime controllers (`capa-controller-manager` and `endpoint-controller`) run
+with least-privilege credentials and never hold `iam:CreateRole` or
+`iam:PutRolePolicy` permissions. Run `endpoint-controller iam apply` once with
+admin credentials to provision the known-quantity IAM roles, policies, and
+worker instance profile (`nodes.cluster-api-provider-aws.sigs.k8s.io`):
+
+```sh
+# Create/update the IAM roles, Customer Managed Policies, EC2 Instance Profile,
+# and Kubernetes AWSClusterRoleIdentity.
+# Pass --create-vpc if the region has no default VPC or you want an isolated VPC:
+endpoint-controller iam apply \
+  --tuple="k0s + calico,bgp + aws,aws-vpc" \
+  --cluster=site-aws \
+  --region=us-west-2 \
+  --cluster-role-identity=site-aws-identity \
+  --source-identity=aws-static-creds \
+  --kubeconfig="$KUBECONFIG"
+
+# Tear down all owned IAM roles, policies, instance profile, and managed VPC/SG resources:
+endpoint-controller iam cleanup \
+  --tuple="k0s + calico,bgp + aws,aws-vpc" \
+  --cluster=site-aws \
+  --region=us-west-2 \
+  --kubeconfig="$KUBECONFIG"
+```
+
+### How VPC, Subnet, and Security Group Selection Works
+
+Because `AWSCluster` carries `cluster.x-k8s.io/managed-by: external` (so CAPA
+does not create a cloud control-plane ELB or NAT Gateways), **CAPA's
+`AWSCluster` controller stands down and does not pick a VPC, subnet, or
+security group automatically**. Instead, `cloud-provisioning` resolves and
+manages them automatically:
+
+1. **VPC & Public Subnet**:
+   - **Automatic discovery (default)**: When `AWSCluster.spec.network` is
+     omitted, the controller queries EC2 `DescribeVpcs` and `DescribeSubnets`,
+     selects a VPC tagged for the cluster (created by `--create-vpc`) or the
+     region's default VPC (`isDefault: true`) and a public subnet
+     (`mapPublicIpOnLaunch: true`), and patches `AWSCluster.spec.network` and
+     `AWSMachine.spec.subnet`.
+   - **Explicit VPC / Subnet**: To use a specific existing VPC or subnet, set
+     `spec.network.vpc.id` and `spec.network.subnets` on `AWSCluster` (or
+     `spec.template.spec.subnet.id` on `AWSMachineTemplate`).
+2. **Security Group (automatic creation & teardown when unused)**:
+   - Because AWS Security Groups (`sg-...`) are VPC-scoped, a static default ID
+     cannot exist across accounts or VPCs.
+   - When `AWSMachineTemplate` omits `additionalSecurityGroups`, the controller
+     automatically creates `cloud-provisioning-<cluster>` in the resolved VPC
+     (tagged `cloud-provisioning.appmana.com/managed-by=cloud-provisioning`),
+     authorizes inbound `UDP 51820` (`0.0.0.0/0` for WireGuard from on-premises)
+     and all-protocol (`-1`) self-ingress (for node/pod mesh traffic), and
+     attaches its `sg-...` ID to each `AWSMachine`.
+   - When the last `ProvisionedNodeClaim` in the cluster is deleted (or a
+     `ProvisionedNodeGroupClaim` scales to `0`), the controller automatically
+     deletes the security group once the instances terminate.
+
+## 3. Add Cloud Nodes (`ProvisionedNodeClaim` & `ProvisionedNodeGroupClaim`)
 
 See [`examples/node-group.yaml`](examples/node-group.yaml) and
 [`examples/mixed-cloud-workers.yaml`](examples/mixed-cloud-workers.yaml):
 
 ```yaml
-# --- AWS Credentials & Permissions ---
-# 1. CAPA controller (in `capa-system`) launches/terminates EC2 instances.
-#    Its Secret MUST live in `capa-system` and is referenced by an
-#    AWSClusterStaticIdentity (or AWSClusterRoleIdentity to assume an IAM role).
-# 2. The EC2 worker's `iamInstanceProfile` needs only minimal node permissions
-#    (or AmazonEKSWorkerNodePolicy / AmazonEC2ContainerRegistryReadOnly when
-#    using native `aws-vpc` CNI). Set `aws.iamBootstrap.enabled: true` in the
-#    HelmRelease to bootstrap the IAM roles/instance profile automatically.
+# --- Less-Privileged Runtime Credentials ---
+# 1. CAPA controller (in `capa-system`) uses `aws-capa-credentials` (or assumes
+#    the role created by `endpoint-controller iam apply` via AWSClusterRoleIdentity).
+# 2. endpoint-controller (in `cloud-provisioning`) uses `aws-controller-credentials`
+#    bound to the controller policy (`docs/iam/controller.json`), which allows
+#    EC2 VPC/subnet discovery and tag-scoped creation/deletion of the
+#    `cloud-provisioning-<cluster>` security group.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -112,6 +185,8 @@ spec:
 ---
 # The admission webhook automatically stamps `cluster.x-k8s.io/managed-by: external`,
 # fills `controlPlaneEndpoint` from the on-premises API VIP, and defaults `identityRef`.
+# Omit `spec.network` to auto-discover the cluster/default VPC and public subnet,
+# or set `spec.network.vpc.id` and `spec.network.subnets` to pin a specific VPC:
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSCluster
 metadata:
@@ -119,6 +194,14 @@ metadata:
   namespace: cloud-provisioning
 spec:
   region: us-west-2
+  # Optional explicit VPC & public subnet override:
+  # network:
+  #   vpc:
+  #     id: vpc-0123456789abcdef0
+  #   subnets:
+  #     - id: subnet-0123456789abcdef0
+  #       resourceID: subnet-0123456789abcdef0
+  #       isPublic: true
 ---
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
@@ -130,13 +213,12 @@ spec:
     kind: AWSCluster
     name: site-aws
 ---
-# No hardcoded AMI ID, subnet ID, or security group ID is needed:
-# - `additionalSecurityGroups`: patched in automatically by the admission webhook
-#   from `webhook.aws.securityGroupName` / `webhook.aws.securityGroupID`.
-# - `ami`: defaults automatically to Canonical's official Ubuntu 24.04 LTS AMI
-#   lookup (`099720109477` / `ubuntu-noble-24.04`) matching `amd64` or `arm64`.
-# - `subnet`: omitted so CAPA automatically selects a subnet from `AWSCluster`.
-# - `iamInstanceProfile`: defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
+# No AMI ID, subnet ID, or security group ID is needed:
+# - Security group (`cloud-provisioning-site-aws`) is created in the VPC when the
+#   first node is claimed and deleted automatically when the last node is removed.
+# - `ami` defaults to Canonical's official Ubuntu 24.04 LTS AMI lookup (`099720109477`).
+# - `subnet` is populated automatically from the discovered or configured VPC public subnet.
+# - `iamInstanceProfile` defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
@@ -161,9 +243,6 @@ spec:
       publicIP: true
 ---
 # --- Option A: Single Cloud Worker Node (ProvisionedNodeClaim) ---
-# Applying this resource launches the cloud VM, configures its WireGuard tunnel,
-# and joins it to the on-premises cluster. Deleting it drains the node,
-# tears down the VM, and removes its WireGuard peer.
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
 metadata:
@@ -178,8 +257,7 @@ spec:
 # Maintains `spec.replicas` child ProvisionedNodeClaims (<group>-<uid-hash>-<ordinal>).
 # Scaling up provisions new cloud nodes; scaling down cordons and drains the
 # highest-ordinal Node via the Eviction API, withdraws its WireGuard peer, and
-# terminates the cloud instance. Each joined Node is labeled with:
-#   cloud-provisioning.appmana.com/node-group-uid: <metadata.uid of this group>
+# terminates the cloud instance (and deletes the security group when scaled to 0).
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeGroupClaim
 metadata:
@@ -209,32 +287,17 @@ Multiple CAPI providers can run side by side in the same namespace
 
 | Provider | Package | Specialization |
 | --- | --- | --- |
-| AWS (`AWSMachine`) | `controller/pkg/join/aws` | EC2 IMDSv2 identity, webhook SG/AMI/profile defaults, CAPA `capa-system` Secret & SG validation, optional `aws-vpc` CNI |
+| AWS (`AWSMachine`) | `controller/pkg/join/aws` | EC2 IMDSv2 identity, auto VPC/subnet discovery, auto SG lifecycle (`cloud-provisioning-<cluster>`), AMI/profile defaults, `aws-vpc` CNI |
 | GCP (`GCPMachine`) | `controller/pkg/join/gcp` | GCE metadata identity, `credentialsRef` check, `publicIP`/`imageFamily`/`failureDomain` defaults, `startup-script` `cloud-init` bridge |
 | Generic CAPI (`*Machine`) | `controller/pkg/join/generic` | Any `<Kind>Template` / `<Kind>Cluster` (e.g. CAPZ `AzureMachine`) |
 | Labcontainers / Docker | `controller/pkg/join/labcontainers`, `controller/pkg/join/docker` | Simulated WAN VMs and containers for e2e tests |
 
-## 3. Cluster Preflight & Remediation
+## 4. Cluster Preflight & Remediation
 
 ```sh
 endpoint-controller check --tuple="k0s + calico,bgp + aws" --kubeconfig="$KUBECONFIG"
 endpoint-controller fix   --tuple="k0s + calico,bgp + aws" --kubeconfig="$KUBECONFIG" --manifests=./clusters/my-cluster
 ```
-
-## Supported Configurations
-
-| Distro | Site CNI | Worker OS / Arch | Cloud CNI | AWS | GCP | Generic CAPI | Labcontainers |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: |
-| `k0s` | `calico,bgp` | Linux (`amd64`, `arm64`) | `site` | ☑ |  |  | ☑ |
-| `k0s` | `calico,bgp` | Linux (`amd64`, `arm64`) | `aws-vpc` | ☑ |  |  |  |
-| `k0s` | `calico,bgp` | Windows (`amd64`) | `site` | ☑ |  |  |  |
-| `k0s` | `calico,bgp` | Windows (`amd64`) | `aws-vpc` | ☑ |  |  |  |
-| `k0s` | `calico,vxlan` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
-| `k0s` | `kube-router` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
-| `k3s` | `flannel` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
-| `rke2` | `canal` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
-| `microk8s` | `calico` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
-| `kubeadm` | `calico,bgp` | Linux (`amd64`, `arm64`) | `site` |  |  |  | ☑ |
 
 ## Documentation
 

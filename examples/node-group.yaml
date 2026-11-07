@@ -12,15 +12,17 @@
 #      from that static identity so sessions auto-renew).
 #
 # 2. cloud-provisioning endpoint-controller (in namespace cloud-provisioning):
-#    Validates security groups before machine creation, signs s3:// bootstrap
-#    URLs (if used), and observes native AWS VPC CNI pod IP allocations.
-#    - In HelmRelease values, set `aws.credentials.secretName: aws-credentials`
+#    Discovers the cluster's VPC & public subnet, automatically provisions the
+#    VPC-scoped WireGuard + pod-mesh security group (`cloud-provisioning-<cluster>`)
+#    when the first claim is created and deletes it when the last claim is removed,
+#    validates security groups, and observes native AWS VPC CNI pod IP allocations.
+#    - Run `endpoint-controller iam apply --cluster=site-aws --region=us-west-2`
+#      once with admin credentials to create the known-quantity IAM roles,
+#      policies, and worker instance profile (`nodes.cluster-api-provider-aws.sigs.k8s.io`),
+#      or set `aws.iamBootstrap.enabled: true` in the HelmRelease.
+#    - In HelmRelease values, set `aws.credentials.secretName: aws-controller-credentials`
 #      (a Secret in `cloud-provisioning` with keys AWS_ACCESS_KEY_ID,
-#      AWS_SECRET_ACCESS_KEY, AWS_REGION) and `providerManagerNamespaces: [capa-system]`
-#      so preflight checks can verify the CAPA Secret in `capa-system` exists.
-#    - Optional: set `aws.iamBootstrap.enabled: true` in HelmRelease values to
-#      automatically create/update the required IAM roles, instance profiles,
-#      and policies at install/upgrade time.
+#      AWS_SECRET_ACCESS_KEY, AWS_REGION) and `providerManagerNamespaces: [capa-system]`.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -71,12 +73,16 @@ spec:
     name: site-aws
 ---
 # No hardcoded AMI ID, subnet ID, or security group ID is needed in the template:
-# - `additionalSecurityGroups`: patched in automatically by the admission webhook
-#   from `webhook.aws.securityGroupID` / `webhook.aws.securityGroupName` in the
-#   HelmRelease (allowing inbound UDP 51820 from on-premises).
+# - `additionalSecurityGroups`: when omitted, the controller automatically creates
+#   a VPC-scoped security group (`cloud-provisioning-site-aws`) in the cluster's VPC
+#   authorizing inbound UDP 51820 (WireGuard) and self-ingress (`-1` for pod mesh),
+#   and tears it down automatically when the last node claim in the cluster is deleted.
 # - `ami`: defaults automatically to Canonical's official Ubuntu 24.04 LTS AMI
 #   lookup (`099720109477` / `ubuntu-noble-24.04`) matching `amd64` or `arm64`.
-# - `subnet`: omitted so CAPA automatically selects a subnet from `AWSCluster`.
+# - `subnet`: when omitted on both `AWSCluster` and `AWSMachineTemplate`, the
+#   controller discovers the cluster-tagged or default VPC and public subnet
+#   automatically (because CAPA's AWSCluster controller stands down on
+#   `managed-by: external` clusters and does not pick a VPC/subnet itself).
 # - `iamInstanceProfile`: defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate

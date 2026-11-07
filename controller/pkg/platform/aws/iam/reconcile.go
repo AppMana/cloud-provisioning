@@ -78,6 +78,9 @@ type ReconcileReport struct {
 	TagsReconciled         []string `json:"tagsReconciled,omitempty"`
 	InstanceProfileEnsured string   `json:"instanceProfileEnsured,omitempty"`
 	ClusterIdentityUpdated string   `json:"clusterIdentityUpdated,omitempty"`
+	VPCID                  string   `json:"vpcId,omitempty"`
+	SubnetID               string   `json:"subnetId,omitempty"`
+	SecurityGroupID        string   `json:"securityGroupId,omitempty"`
 	Changes                []string `json:"changes,omitempty"`
 }
 
@@ -89,6 +92,7 @@ type CleanupReport struct {
 	InstanceProfilesDeleted []string `json:"instanceProfilesDeleted,omitempty"`
 	RolesDeleted            []string `json:"rolesDeleted,omitempty"`
 	PoliciesDeleted         []string `json:"policiesDeleted,omitempty"`
+	NetworkResourcesDeleted []string `json:"networkResourcesDeleted,omitempty"`
 	SkippedUnowned          []string `json:"skippedUnowned,omitempty"`
 	Changes                 []string `json:"changes,omitempty"`
 }

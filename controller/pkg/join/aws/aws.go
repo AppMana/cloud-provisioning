@@ -37,6 +37,7 @@ type AWSSpecDefaults struct {
 	SecurityGroupName  string
 	IAMInstanceProfile string
 	SSHKeyName         string
+	VPCID              string
 	SubnetID           string
 	AMIAMD64           string
 	AMIARM64           string
@@ -144,6 +145,7 @@ func (p Provider) ConfigDefaults(ctx context.Context) AWSSpecDefaults {
 	if out.SSHKeyName == "" {
 		out.SSHKeyName = readKey("ssh-key-name")
 	}
+	out.VPCID = readKey("vpc-id")
 	out.SubnetID = readKey("subnet-id")
 	out.AMIAMD64 = readKey("ami-amd64")
 	out.AMIARM64 = readKey("ami-arm64")

@@ -6,8 +6,10 @@
 # (AWSMachineTemplate -> AWSCluster, GCPMachineTemplate -> GCPCluster,
 # AzureMachineTemplate -> AzureCluster).
 #
-# The mutating admission webhook automatically patches in:
-# - On-premises WireGuard security groups (`webhook.aws.securityGroupID` / `securityGroupName`)
+# The mutating admission webhook and controller automatically handle:
+# - VPC & public subnet discovery on external AWSClusters, plus automatic creation
+#   and teardown (when unused) of the VPC-scoped `cloud-provisioning-<cluster>`
+#   security group allowing inbound UDP 51820 and pod-mesh self-ingress
 # - Official Ubuntu 24.04 LTS AMI/imageFamily lookup when `ami` / `imageFamily` is omitted
 # - `publicIP: true` (or `allocatePublicIP: true` on Azure) so on-premises nodes
 #   behind NAT can dial outbound UDP 51820 to the cloud worker's public IP

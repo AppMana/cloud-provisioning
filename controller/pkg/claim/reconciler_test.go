@@ -103,10 +103,7 @@ func fakeCluster(name string) *unstructured.Unstructured {
 func awsConfigSecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "aws-provider-config", Namespace: "wg-dialer"},
-		Data: map[string][]byte{
-			"ami-arm64": []byte("ami-0abc"),
-			"subnet-id": []byte("subnet-9"),
-		},
+		Data:       map[string][]byte{},
 	}
 }
 
@@ -123,7 +120,9 @@ func fakeNode() *corev1.Node {
 var infraGroup = "infrastructure.cluster.x-k8s.io"
 
 // fakeTemplate is the machine template a claim points at: ordinary
-// Cluster API, holding the machine's spec where the contract says.
+// Cluster API, holding only the instance type (AMI lookup, publicIP,
+// IAM instance profile, VPC/subnet discovery, and security group
+// provisioning are all handled automatically).
 func fakeTemplate(name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
@@ -131,10 +130,6 @@ func fakeTemplate(name string) *unstructured.Unstructured {
 		"metadata":   map[string]any{"name": name, "namespace": "default"},
 		"spec": map[string]any{"template": map[string]any{"spec": map[string]any{
 			"instanceType": "t3.micro",
-			"ami":          map[string]any{"id": "ami-000000000000000ab"},
-			"additionalSecurityGroups": []any{
-				map[string]any{"id": "sg-000000000000000cd"},
-			},
 		}}},
 	}}
 }
@@ -199,10 +194,11 @@ func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 		WithStatusSubresource(statusSubresources...).
 		WithObjects(objs...).
 		Build()
+	ec2Fake := newFakeEC2Network()
 	return &Reconciler{
 		Client:                    c,
 		Reader:                    c,
-		Provisioners:              []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config", EC2: admittingGroups}},
+		Provisioners:              []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config", EC2: ec2Fake.ProviderFunc()}},
 		RoleLabel:                 "cloud-provisioning.appmana.com/role",
 		RoleValue:                 "cloud-worker",
 		BootstrapSecretNameFormat: "%s-bootstrap",
@@ -236,9 +232,20 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	if instanceType != "t3.micro" {
 		t.Errorf("AWSMachine instanceType = %q, want the template's t3.micro", instanceType)
 	}
-	ami, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "ami", "id")
-	if ami != "ami-000000000000000ab" {
-		t.Errorf("AWSMachine ami = %q, want the template's ami", ami)
+	baseOS, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "imageLookupBaseOS")
+	if baseOS != joinaws.DefaultImageLookupBaseOS {
+		t.Errorf("AWSMachine imageLookupBaseOS = %q, want default %q", baseOS, joinaws.DefaultImageLookupBaseOS)
+	}
+	subnetID, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "subnet", "id")
+	if subnetID != "subnet-0public1234" {
+		t.Errorf("AWSMachine subnet.id = %q, want auto-discovered subnet-0public1234", subnetID)
+	}
+	sgs, _, _ := unstructured.NestedSlice(awsMachine.Object, "spec", "additionalSecurityGroups")
+	if len(sgs) != 1 {
+		t.Fatalf("AWSMachine additionalSecurityGroups = %v, want 1 auto-provisioned security group", sgs)
+	}
+	if sgMap, _ := sgs[0].(map[string]any); sgMap["id"] != "sg-auto-cloud-provisioning-appmana" {
+		t.Errorf("AWSMachine additionalSecurityGroups[0] = %v, want sg-auto-cloud-provisioning-appmana", sgMap)
 	}
 	if len(awsMachine.GetOwnerReferences()) != 1 || awsMachine.GetOwnerReferences()[0].Kind != "ProvisionedNodeClaim" {
 		t.Errorf("AWSMachine ownerReferences = %+v, want exactly the claim (cascade delete)", awsMachine.GetOwnerReferences())
@@ -607,10 +614,13 @@ func TestReconcileDelete_PreservesInfrastructureWhileCAPIDeletionIsPending(t *te
 func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	claim := fakeClaim("public-worker")
 	template := fakeTemplate("public-worker")
+	_ = unstructured.SetNestedField(template.Object, "ami-0customwindows", "spec", "template", "spec", "ami", "id")
+	_ = unstructured.SetNestedSlice(template.Object, []any{map[string]any{"id": "sg-0customexplicit"}}, "spec", "template", "spec", "additionalSecurityGroups")
 	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"kubernetes.io/os": "windows", clusterNameLabel: "must-not-override-cluster"}, "spec", "template", "metadata", "labels")
 	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"image.example/recipe": "windows-2025"}, "spec", "template", "metadata", "annotations")
 	r := newClaimReconciler(t, claim, template, fakeCluster("appmana"), fakeNode())
-	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config", EC2: admittingGroups, WindowsIPAM: true}}
+	ec2Fake := newFakeEC2Network()
+	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config", EC2: ec2Fake.ProviderFunc(), WindowsIPAM: true}}
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
@@ -628,11 +638,9 @@ func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	if machine.GetLabels()["kubernetes.io/os"] != "windows" || machine.GetLabels()[clusterNameLabel] != "appmana" || machine.GetAnnotations()["image.example/recipe"] != "windows-2025" {
 		t.Errorf("template guest metadata or controller-owned cluster label lost: labels=%v annotations=%v", machine.GetLabels(), machine.GetAnnotations())
 	}
-	if ami, _, _ := unstructured.NestedString(machine.Object, "spec", "ami", "id"); ami != "ami-000000000000000ab" {
-		t.Errorf("ami = %q, want the template's", ami)
+	if ami, _, _ := unstructured.NestedString(machine.Object, "spec", "ami", "id"); ami != "ami-0customwindows" {
+		t.Errorf("ami = %q, want the template's explicit ami-0customwindows", ami)
 	}
-	// The security groups are the reason the template exists: carried
-	// here, reachability never depends on an out-of-band change.
 	sgs, found, _ := unstructured.NestedSlice(machine.Object, "spec", "additionalSecurityGroups")
 	if !found || len(sgs) != 1 {
 		t.Fatalf("additionalSecurityGroups = %v, want the template's one entry", sgs)
@@ -810,29 +818,150 @@ func TestReconcile_NativeNetworkMachinesWaitForTheSiteNetworkExclusion(t *testin
 	}
 }
 
-// selfAdmitting answers every security group as allowing all traffic from
-// itself, as a VPC CNI node's groups must.
-type selfAdmitting struct{}
-
-func (selfAdmitting) Call(_ context.Context, _, _ string, input map[string]any) (json.RawMessage, error) {
-	var groups []map[string]any
-	for _, id := range input["GroupIds"].([]string) {
-		groups = append(groups, map[string]any{"GroupId": id, "IpPermissions": []any{
-			map[string]any{"IpProtocol": "-1", "UserIdGroupPairs": []any{map[string]any{"GroupId": id}}}}})
-	}
-	return json.Marshal(map[string]any{"SecurityGroups": groups})
+type fakeEC2SecurityGroup struct {
+	GroupId       string
+	GroupName     string
+	VpcId         string
+	Tags          []map[string]any
+	IpPermissions []map[string]any
 }
 
-func admittingGroups(context.Context, string) (attachmentaws.API, error) { return selfAdmitting{}, nil }
+type fakeEC2Network struct {
+	sgs        map[string]*fakeEC2SecurityGroup
+	createdSGs []string
+	deletedSGs []string
+}
+
+func newFakeEC2Network() *fakeEC2Network {
+	return &fakeEC2Network{
+		sgs: map[string]*fakeEC2SecurityGroup{},
+	}
+}
+
+func (f *fakeEC2Network) ProviderFunc() func(context.Context, string) (attachmentaws.API, error) {
+	return func(context.Context, string) (attachmentaws.API, error) {
+		return f, nil
+	}
+}
+
+func (f *fakeEC2Network) Call(_ context.Context, _, op string, input map[string]any) (json.RawMessage, error) {
+	switch op {
+	case "describe-vpcs":
+		return json.Marshal(map[string]any{
+			"Vpcs": []map[string]any{
+				{"VpcId": "vpc-0default1234", "IsDefault": true, "State": "available"},
+			},
+		})
+	case "describe-subnets":
+		return json.Marshal(map[string]any{
+			"Subnets": []map[string]any{
+				{
+					"SubnetId":            "subnet-0public1234",
+					"VpcId":               "vpc-0default1234",
+					"AvailabilityZone":    "us-west-2a",
+					"MapPublicIpOnLaunch": true,
+					"DefaultForAz":        true,
+					"State":               "available",
+				},
+			},
+		})
+	case "describe-security-groups":
+		if ids, ok := input["GroupIds"].([]string); ok {
+			var groups []map[string]any
+			for _, id := range ids {
+				if sg, exists := f.sgs[id]; exists {
+					groups = append(groups, map[string]any{
+						"GroupId":       sg.GroupId,
+						"GroupName":     sg.GroupName,
+						"Tags":          sg.Tags,
+						"IpPermissions": sg.IpPermissions,
+					})
+				} else {
+					groups = append(groups, map[string]any{
+						"GroupId": id,
+						"IpPermissions": []any{
+							map[string]any{"IpProtocol": "-1", "UserIdGroupPairs": []any{map[string]any{"GroupId": id}}},
+						},
+					})
+				}
+			}
+			return json.Marshal(map[string]any{"SecurityGroups": groups})
+		}
+		var wantGroupName string
+		if filters, ok := input["Filters"].([]map[string]any); ok {
+			for _, fl := range filters {
+				if fl["Name"] == "group-name" {
+					if vals, ok := fl["Values"].([]string); ok && len(vals) > 0 {
+						wantGroupName = vals[0]
+					}
+				}
+			}
+		}
+		var groups []map[string]any
+		for _, sg := range f.sgs {
+			if wantGroupName == "" || sg.GroupName == wantGroupName {
+				groups = append(groups, map[string]any{
+					"GroupId":       sg.GroupId,
+					"GroupName":     sg.GroupName,
+					"Tags":          sg.Tags,
+					"IpPermissions": sg.IpPermissions,
+				})
+			}
+		}
+		return json.Marshal(map[string]any{"SecurityGroups": groups})
+	case "create-security-group":
+		groupName, _ := input["GroupName"].(string)
+		vpcID, _ := input["VpcId"].(string)
+		sgID := "sg-auto-" + groupName
+		var tags []map[string]any
+		if specs, ok := input["TagSpecifications"].([]map[string]any); ok {
+			for _, sp := range specs {
+				if tList, ok := sp["Tags"].([]map[string]any); ok {
+					tags = append(tags, tList...)
+				}
+			}
+		}
+		f.sgs[sgID] = &fakeEC2SecurityGroup{
+			GroupId:   sgID,
+			GroupName: groupName,
+			VpcId:     vpcID,
+			Tags:      tags,
+		}
+		f.createdSGs = append(f.createdSGs, sgID)
+		return json.Marshal(map[string]any{"GroupId": sgID})
+	case "authorize-security-group-ingress":
+		sgID, _ := input["GroupId"].(string)
+		if sg, exists := f.sgs[sgID]; exists {
+			if perms, ok := input["IpPermissions"].([]map[string]any); ok {
+				sg.IpPermissions = append(sg.IpPermissions, perms...)
+			}
+		}
+		return json.Marshal(map[string]any{"Return": true})
+	case "describe-network-interfaces":
+		return json.Marshal(map[string]any{"NetworkInterfaces": []any{}})
+	case "delete-security-group":
+		sgID, _ := input["GroupId"].(string)
+		delete(f.sgs, sgID)
+		f.deletedSGs = append(f.deletedSGs, sgID)
+		return json.Marshal(map[string]any{})
+	default:
+		return json.Marshal(map[string]any{})
+	}
+}
 
 // separateGroups answers every security group as admitting nothing from
 // the others.
 type separateGroups struct{}
 
-func (separateGroups) Call(_ context.Context, _, _ string, input map[string]any) (json.RawMessage, error) {
+func (separateGroups) Call(_ context.Context, _, op string, input map[string]any) (json.RawMessage, error) {
+	if op != "describe-security-groups" {
+		return json.Marshal(map[string]any{})
+	}
 	var groups []map[string]any
-	for _, id := range input["GroupIds"].([]string) {
-		groups = append(groups, map[string]any{"GroupId": id})
+	if ids, ok := input["GroupIds"].([]string); ok {
+		for _, id := range ids {
+			groups = append(groups, map[string]any{"GroupId": id})
+		}
 	}
 	return json.Marshal(map[string]any{"SecurityGroups": groups})
 }
@@ -841,7 +970,9 @@ func (separateGroups) Call(_ context.Context, _, _ string, input map[string]any)
 // the reason, and no AWSMachine is created.
 func TestReconcile_VPCCNIMachinesNeedGroupsThatAdmitEachOther(t *testing.T) {
 	claim := fakeClaim("isolated")
-	r := newClaimReconciler(t, claim, fakeTemplate("isolated"), fakeCluster("appmana"), fakeNode())
+	template := fakeTemplate("isolated")
+	_ = unstructured.SetNestedSlice(template.Object, []any{map[string]any{"id": "sg-custom-isolated"}}, "spec", "template", "spec", "additionalSecurityGroups")
+	r := newClaimReconciler(t, claim, template, fakeCluster("appmana"), fakeNode())
 	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config",
 		EC2: func(context.Context, string) (attachmentaws.API, error) { return separateGroups{}, nil }}}
 	if err := reconcileClaim(t, r, claim); err == nil {
@@ -853,8 +984,84 @@ func TestReconcile_VPCCNIMachinesNeedGroupsThatAdmitEachOther(t *testing.T) {
 		t.Fatalf("an AWSMachine exists: %v", err)
 	}
 	got := &v1alpha1.ProvisionedNodeClaim{}
-	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), got); err != nil || got.Status.Phase != "Failed" || !strings.Contains(got.Status.Message, "sg-000000000000000cd") {
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), got); err != nil || got.Status.Phase != "Failed" || !strings.Contains(got.Status.Message, "sg-custom-isolated") {
 		t.Fatalf("status = %+v, %v", got.Status, err)
+	}
+}
+
+func TestReconcile_AutoProvisionsVPCSubnetAndSecurityGroupAndTearsDownWhenUnused(t *testing.T) {
+	ctx := context.Background()
+	claim1 := fakeClaim("worker-1")
+	claim1.UID = "uid-worker-1"
+	claim2 := fakeClaim("worker-2")
+	claim2.UID = "uid-worker-2"
+	claim2.Spec.InfrastructureRef.Name = "worker-1"
+
+	r := newClaimReconciler(t, claim1, claim2, fakeTemplate("worker-1"), fakeCluster("appmana"), fakeNode())
+	ec2Fake := newFakeEC2Network()
+	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{
+		ConfigNamespace: "wg-dialer",
+		ConfigName:      "aws-provider-config",
+		EC2:             ec2Fake.ProviderFunc(),
+	}}
+
+	// Reconcile both claims: VPC/subnet should be discovered and patched onto AWSCluster,
+	// and a single security group sg-auto-cloud-provisioning-appmana should be created and reused.
+	if err := reconcileClaim(t, r, claim1); err != nil {
+		t.Fatalf("reconcileClaim(worker-1): %v", err)
+	}
+	if err := reconcileClaim(t, r, claim2); err != nil {
+		t.Fatalf("reconcileClaim(worker-2): %v", err)
+	}
+	if len(ec2Fake.createdSGs) != 1 || ec2Fake.createdSGs[0] != "sg-auto-cloud-provisioning-appmana" {
+		t.Fatalf("createdSGs = %v, want [sg-auto-cloud-provisioning-appmana] created exactly once", ec2Fake.createdSGs)
+	}
+
+	awsCluster := &unstructured.Unstructured{}
+	awsCluster.SetGroupVersionKind(joinaws.Provider{}.ClusterGVK())
+	if err := r.Get(ctx, client.ObjectKey{Namespace: "default", Name: "appmana"}, awsCluster); err != nil {
+		t.Fatalf("getting AWSCluster: %v", err)
+	}
+	if vpcID, _, _ := unstructured.NestedString(awsCluster.Object, "spec", "network", "vpc", "id"); vpcID != "vpc-0default1234" {
+		t.Fatalf("AWSCluster spec.network.vpc.id = %q, want vpc-0default1234", vpcID)
+	}
+	if awsCluster.GetAnnotations()[joinaws.ManagedSGAnnotation] != "sg-auto-cloud-provisioning-appmana" {
+		t.Fatalf("AWSCluster annotation %s = %q, want sg-auto-cloud-provisioning-appmana",
+			joinaws.ManagedSGAnnotation, awsCluster.GetAnnotations()[joinaws.ManagedSGAnnotation])
+	}
+
+	// Delete worker-1 while worker-2 is still active: security group MUST NOT be deleted yet.
+	c1 := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(claim1), c1); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Delete(ctx, c1); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := reconcileClaim(t, r, c1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(ec2Fake.deletedSGs) != 0 {
+		t.Fatalf("security group deleted while worker-2 still active: %v", ec2Fake.deletedSGs)
+	}
+
+	// Now delete worker-2 (the last claim in the cluster): security group MUST be automatically deleted.
+	c2 := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(claim2), c2); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Delete(ctx, c2); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := reconcileClaim(t, r, c2); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(ec2Fake.deletedSGs) != 1 || ec2Fake.deletedSGs[0] != "sg-auto-cloud-provisioning-appmana" {
+		t.Fatalf("deletedSGs = %v, want [sg-auto-cloud-provisioning-appmana] deleted when unused", ec2Fake.deletedSGs)
 	}
 }
 

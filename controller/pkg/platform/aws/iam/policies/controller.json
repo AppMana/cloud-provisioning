@@ -7,12 +7,53 @@
       "Action": [
         "ec2:DescribeNetworkInterfaces",
         "ec2:DescribeSubnets",
-        "ec2:DescribeSecurityGroups"
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeAvailabilityZones"
       ],
       "Resource": "*",
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "CreateCloudProvisioningSecurityGroupInVPC",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSecurityGroup"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:vpc/*"
+    },
+    {
+      "Sid": "CreateAndTagCloudProvisioningSecurityGroup",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSecurityGroup",
+        "ec2:CreateTags"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:security-group/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/cloud-provisioning.appmana.com/managed-by": "cloud-provisioning"
+        }
+      }
+    },
+    {
+      "Sid": "ManageAndDeleteCloudProvisioningSecurityGroup",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:DeleteSecurityGroup",
+        "ec2:CreateTags"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:security-group/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/cloud-provisioning.appmana.com/managed-by": "cloud-provisioning"
         }
       }
     }

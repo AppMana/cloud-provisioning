@@ -2,12 +2,14 @@ package nodegroup
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
@@ -172,7 +174,11 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 		t.Fatalf("child ProvisionedNodeClaim count = %d, want 3", len(children.Items))
 	}
 
-	awsProv := joinaws.Provider{}
+	awsProv := joinaws.Provider{
+		EC2: func(context.Context, string) (attachmentaws.API, error) {
+			return exampleEC2{}, nil
+		},
+	}
 	claimReconciler := &claim.Reconciler{
 		Client:                    c,
 		Reader:                    c,
@@ -195,5 +201,42 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 		if err := awsProv.Validate(ctx, c, awsMachine); err != nil {
 			t.Fatalf("aws.Provider.Validate(%s): %v", ch.Name, err)
 		}
+		sgs, _, _ := unstructured.NestedSlice(awsMachine.Object, "spec", "additionalSecurityGroups")
+		if len(sgs) != 1 {
+			t.Fatalf("%s additionalSecurityGroups = %v, want 1 auto-provisioned security group", ch.Name, sgs)
+		}
+	}
+}
+
+type exampleEC2 struct{}
+
+func (exampleEC2) Call(_ context.Context, _, op string, input map[string]any) (json.RawMessage, error) {
+	switch op {
+	case "describe-vpcs":
+		return json.Marshal(map[string]any{
+			"Vpcs": []map[string]any{{"VpcId": "vpc-0default", "IsDefault": true, "State": "available"}},
+		})
+	case "describe-subnets":
+		return json.Marshal(map[string]any{
+			"Subnets": []map[string]any{{"SubnetId": "subnet-0public", "VpcId": "vpc-0default", "MapPublicIpOnLaunch": true}},
+		})
+	case "create-security-group":
+		return json.Marshal(map[string]any{"GroupId": "sg-auto-site-aws"})
+	case "describe-security-groups":
+		if _, byID := input["GroupIds"]; byID {
+			return json.Marshal(map[string]any{
+				"SecurityGroups": []map[string]any{
+					{
+						"GroupId": "sg-auto-site-aws",
+						"IpPermissions": []map[string]any{
+							{"IpProtocol": "-1", "UserIdGroupPairs": []map[string]any{{"GroupId": "sg-auto-site-aws"}}},
+						},
+					},
+				},
+			})
+		}
+		return json.Marshal(map[string]any{"SecurityGroups": []any{}})
+	default:
+		return json.Marshal(map[string]any{})
 	}
 }

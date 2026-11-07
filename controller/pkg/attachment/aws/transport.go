@@ -45,10 +45,50 @@ func (t *EC2Transport) Call(ctx context.Context, service, operation string, inpu
 		return sdkCall(ctx, input, t.client.DeleteRoute)
 	case "modify-network-interface-attribute":
 		return sdkCall(ctx, input, t.client.ModifyNetworkInterfaceAttribute)
+	case "describe-vpcs":
+		return sdkCall(ctx, input, t.client.DescribeVpcs)
+	case "create-vpc":
+		return sdkCall(ctx, input, t.client.CreateVpc)
+	case "delete-vpc":
+		return sdkCall(ctx, input, t.client.DeleteVpc)
+	case "modify-vpc-attribute":
+		return sdkCall(ctx, input, t.client.ModifyVpcAttribute)
+	case "describe-availability-zones":
+		return sdkCall(ctx, input, t.client.DescribeAvailabilityZones)
+	case "create-subnet":
+		return sdkCall(ctx, input, t.client.CreateSubnet)
+	case "delete-subnet":
+		return sdkCall(ctx, input, t.client.DeleteSubnet)
+	case "modify-subnet-attribute":
+		return sdkCall(ctx, input, t.client.ModifySubnetAttribute)
+	case "create-internet-gateway":
+		return sdkCall(ctx, input, t.client.CreateInternetGateway)
+	case "describe-internet-gateways":
+		return sdkCall(ctx, input, t.client.DescribeInternetGateways)
+	case "attach-internet-gateway":
+		return sdkCall(ctx, input, t.client.AttachInternetGateway)
+	case "detach-internet-gateway":
+		return sdkCall(ctx, input, t.client.DetachInternetGateway)
+	case "delete-internet-gateway":
+		return sdkCall(ctx, input, t.client.DeleteInternetGateway)
+	case "create-route-table":
+		return sdkCall(ctx, input, t.client.CreateRouteTable)
+	case "associate-route-table":
+		return sdkCall(ctx, input, t.client.AssociateRouteTable)
+	case "disassociate-route-table":
+		return sdkCall(ctx, input, t.client.DisassociateRouteTable)
+	case "delete-route-table":
+		return sdkCall(ctx, input, t.client.DeleteRouteTable)
 	case "describe-subnets":
 		return sdkCall(ctx, input, t.client.DescribeSubnets)
 	case "describe-security-groups":
 		return sdkCall(ctx, input, t.client.DescribeSecurityGroups)
+	case "create-security-group":
+		return sdkCall(ctx, input, t.client.CreateSecurityGroup)
+	case "delete-security-group":
+		return sdkCall(ctx, input, t.client.DeleteSecurityGroup)
+	case "create-tags":
+		return sdkCall(ctx, input, t.client.CreateTags)
 	case "describe-security-group-rules":
 		return sdkCall(ctx, input, t.client.DescribeSecurityGroupRules)
 	case "authorize-security-group-ingress":

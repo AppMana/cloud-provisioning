@@ -127,6 +127,17 @@ type InfraMachinePreparer interface {
 	PrepareInfraMachine(infraMachine *unstructured.Unstructured) (failureDomain string, err error)
 }
 
+// ClusterNetworkProvisioner is an optional MachineProvisioner capability that
+// resolves and provisions the cloud network prerequisites a machine needs on
+// an externally-managed cluster (e.g. discovering the VPC and public subnet on
+// AWSCluster and automatically creating the cluster's WireGuard + pod-mesh
+// security group when none is specified), and tears down controller-created
+// network resources when the last claim in the cluster is deleted.
+type ClusterNetworkProvisioner interface {
+	EnsureMachineNetwork(ctx context.Context, c client.Client, reader client.Reader, cluster, infraMachine *unstructured.Unstructured) error
+	CleanupClusterNetwork(ctx context.Context, c client.Client, reader client.Reader, cluster *unstructured.Unstructured) error
+}
+
 // NodeLocalBalancer is an optional capability a ClusterJoinProvider
 // implements when its distribution ships no node-local balancing of
 // its own, so a joining worker needs the operator's loopback balancer

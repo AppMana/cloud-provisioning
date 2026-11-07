@@ -5,7 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
+	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	awsiam "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws/iam"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -35,6 +40,8 @@ type IAMConfig struct {
 	ClusterRoleIdentity   string
 	SourceIdentityName    string
 	AllowedNamespace      string
+	CreateVPC             bool
+	EC2                   attachmentaws.API
 }
 
 // BuildIAMOptions translates a parsed platform tuple Spec and IAMConfig into
@@ -121,16 +128,91 @@ func ApplyIAMBundle(ctx context.Context, api awsiam.API, writer client.Client, r
 			report.Changes = append(report.Changes, fmt.Sprintf("reconciled AWSClusterRoleIdentity %s -> %s", cfg.ClusterRoleIdentity, capaRoleARN))
 		}
 	}
+	if cfg.CreateVPC && cfg.EC2 != nil && !dryRun {
+		clusterName := bundle.ClusterName
+		if clusterName == "" {
+			clusterName = cfg.ClusterName
+		}
+		vpcRep, err := joinaws.ProvisionIsolatedVPC(ctx, cfg.EC2, clusterName)
+		if err != nil {
+			return report, bundle, err
+		}
+		report.VPCID = vpcRep.VPCID
+		report.SubnetID = vpcRep.SubnetID
+		report.SecurityGroupID = vpcRep.SecurityGroupID
+		report.Changes = append(report.Changes, vpcRep.Changes...)
+		if writer != nil && reader != nil {
+			ns := cfg.AllowedNamespace
+			if ns == "" {
+				ns = "cloud-provisioning"
+			}
+			if err := reconcileAWSProviderConfigSecret(ctx, writer, reader, ns, vpcRep.VPCID, vpcRep.SubnetID, vpcRep.SecurityGroupID); err != nil {
+				return report, bundle, err
+			}
+		}
+	}
 	return report, bundle, nil
 }
 
 // CleanupIAMBundle safely tears down all tagged IAM policies, roles, and instance
-// profile in the rendered bundle after verifying ownership tags on every resource.
+// profile in the rendered bundle after verifying ownership tags on every resource,
+// plus any controller-provisioned EC2 Security Group or dedicated VPC when an EC2
+// client is supplied.
 func CleanupIAMBundle(ctx context.Context, api awsiam.API, reader client.Reader, cfg IAMConfig, dryRun bool) (*awsiam.CleanupReport, *awsiam.Bundle, error) {
 	bundle, err := RenderIAMBundle(ctx, reader, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	report, err := awsiam.Cleanup(ctx, api, bundle, dryRun)
-	return report, bundle, err
+	if err != nil {
+		return report, bundle, err
+	}
+	if cfg.EC2 != nil && !dryRun {
+		clusterName := bundle.ClusterName
+		if clusterName == "" {
+			clusterName = cfg.ClusterName
+		}
+		deletedNet, err := joinaws.CleanupIsolatedVPC(ctx, cfg.EC2, clusterName)
+		if err != nil {
+			return report, bundle, err
+		}
+		report.NetworkResourcesDeleted = append(report.NetworkResourcesDeleted, deletedNet...)
+		for _, id := range deletedNet {
+			report.Changes = append(report.Changes, fmt.Sprintf("deleted managed EC2 resource %s", id))
+		}
+	}
+	return report, bundle, nil
+}
+
+func reconcileAWSProviderConfigSecret(ctx context.Context, writer client.Client, reader client.Reader, namespace, vpcID, subnetID, sgID string) error {
+	sec := &corev1.Secret{}
+	key := client.ObjectKey{Namespace: namespace, Name: "aws-provider-config"}
+	err := reader.Get(ctx, key, sec)
+	if apierrors.IsNotFound(err) {
+		sec = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "aws-provider-config", Namespace: namespace},
+			Data: map[string][]byte{
+				"vpc-id":             []byte(vpcID),
+				"subnet-id":          []byte(subnetID),
+				"security-group-ids": []byte(sgID),
+			},
+		}
+		return writer.Create(ctx, sec)
+	}
+	if err != nil {
+		return err
+	}
+	if sec.Data == nil {
+		sec.Data = map[string][]byte{}
+	}
+	if vpcID != "" {
+		sec.Data["vpc-id"] = []byte(vpcID)
+	}
+	if subnetID != "" {
+		sec.Data["subnet-id"] = []byte(subnetID)
+	}
+	if sgID != "" {
+		sec.Data["security-group-ids"] = []byte(sgID)
+	}
+	return writer.Update(ctx, sec)
 }

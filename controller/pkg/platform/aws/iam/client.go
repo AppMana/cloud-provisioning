@@ -66,6 +66,16 @@ func NewClient(cfg sdk.Config) *Client {
 	}
 }
 
+// SDKConfig returns a copy of the client's underlying AWS SDK v2 configuration
+// pinned to the requested region (defaulting to the client's configured region).
+func (c *Client) SDKConfig(region string) sdk.Config {
+	out := c.cfg.Copy()
+	if strings.TrimSpace(region) != "" {
+		out.Region = strings.TrimSpace(region)
+	}
+	return out
+}
+
 func (c *Client) call(ctx context.Context, action string, params map[string]string, out any) (int, string, error) {
 	form := url.Values{}
 	form.Set("Action", action)

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	awsiam "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws/iam"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	corev1 "k8s.io/api/core/v1"
@@ -187,6 +188,7 @@ func Run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	bindString(&iamCfg.ClusterRoleIdentity, "", "optional AWSClusterRoleIdentity name to create/update in Kubernetes during iam-apply", "aws-cluster-role-identity", "cluster-role-identity")
 	bindString(&iamCfg.SourceIdentityName, "", "optional AWSClusterStaticIdentity name referenced by --aws-cluster-role-identity", "aws-source-identity", "source-identity")
 	bindString(&iamCfg.AllowedNamespace, "cloud-provisioning", "namespace allowed to use --aws-cluster-role-identity", "aws-allowed-namespace", "allowed-namespace")
+	bindBool(&iamCfg.CreateVPC, false, "provision a dedicated tagged VPC, public Subnet, Internet Gateway, Route Table, and Security Group during iam-apply", "aws-create-vpc", "create-vpc")
 
 	var positionalVerb string
 	if len(args) > 0 && IsCommand(args[0]) {
@@ -397,6 +399,11 @@ func Run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 		if iamCfg.AccountID == "" {
 			iamCfg.AccountID = acct
 		}
+		if iamCfg.Region != "" {
+			if ec2Transport, err := attachmentaws.NewEC2Transport(iamClient.SDKConfig(iamCfg.Region)); err == nil {
+				iamCfg.EC2 = ec2Transport
+			}
+		}
 		report, _, err := tuple.ApplyIAMBundle(ctx, iamClient, cl, cl, iamCfg, *dryRun)
 		if err != nil {
 			return err
@@ -423,6 +430,11 @@ func Run(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 		}
 		if iamCfg.AccountID == "" {
 			iamCfg.AccountID = acct
+		}
+		if iamCfg.Region != "" {
+			if ec2Transport, err := attachmentaws.NewEC2Transport(iamClient.SDKConfig(iamCfg.Region)); err == nil {
+				iamCfg.EC2 = ec2Transport
+			}
 		}
 		report, _, err := tuple.CleanupIAMBundle(ctx, iamClient, cl, iamCfg, *dryRun)
 		if err != nil {

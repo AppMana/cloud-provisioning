@@ -57,16 +57,44 @@ outside that configured path will not provision anything.
 
 Before applying worker claims, configure:
 
-- CAPI, CAPA, cert-manager and the product chart, including
-  `providerManagerNamespace=capa-system`.
-- A CAPI `Cluster` and its externally managed `AWSCluster`, pointing at the
-  existing VPC/subnet and an `AWSClusterStaticIdentity` with usable credentials.
-- The imported site's control-plane contract and
-  `<cluster-name>-kubeconfig` connection Secret, accessible to CAPI.
-- A prepared AMI, worker instance profile and scoped IAM policies.
-- A matching `joinProvider`, reachable first-boot dialer download with its
-  SHA-256, and a remotely pullable dialer image or configured host-binary
-  adoption image. These chart settings are separate from the machine template.
+- **One-time IAM & optional VPC bootstrap (privileged credentials)**:
+  Run `endpoint-controller iam apply --cluster=<cluster> --region=<region>` once
+  with administrator credentials (or enable the one-shot `aws.iamBootstrap.enabled: true`
+  Helm hook Job). This creates the known-quantity IAM roles
+  (`controllers.cluster-api-provider-aws.sigs.k8s.io` / `<cluster>-capa-controller`,
+  `<cluster>-endpoint-controller`, `nodes.cluster-api-provider-aws.sigs.k8s.io`,
+  `ami-operator.cluster-api-provider-aws.sigs.k8s.io`), Customer Managed Policies,
+  worker EC2 Instance Profile, and Kubernetes `AWSClusterRoleIdentity`.
+  Pass `--create-vpc` if the region has no default VPC or you want an isolated
+  tagged VPC (`172.29.0.0/24`), public Subnet, Internet Gateway, and Route Table.
+- **Least-privilege runtime controllers**:
+  - CAPA (`capa-controller-manager` in `capa-system`) uses its `AWSClusterStaticIdentity`
+    / `AWSClusterRoleIdentity` to launch and terminate tagged EC2 instances.
+  - `endpoint-controller` (in `cloud-provisioning`, configured via `aws.credentials.secretName`)
+    uses [controller.json](iam/controller.json) to discover VPCs/subnets,
+    automatically create and delete the cluster's `cloud-provisioning-<cluster>`
+    security group, and observe AWS VPC CNI pod IP allocations.
+- **How VPC, Subnet, and Security Group selection works**:
+  Because `AWSCluster` carries `cluster.x-k8s.io/managed-by: external` (so CAPA
+  does not provision a cloud control-plane load balancer or NAT Gateways),
+  **CAPA's `AWSCluster` controller stands down and does not pick a VPC, subnet,
+  or security group automatically**. Instead, `cloud-provisioning` resolves them:
+  1. **VPC & Public Subnet**: Uses `AWSCluster.spec.network.vpc.id` and
+     `AWSCluster.spec.network.subnets` when explicitly set; otherwise queries
+     EC2 for a VPC tagged for the cluster (`--create-vpc`), the region's default
+     VPC (`isDefault: true`), or the sole VPC in the region, selects a public
+     subnet (`mapPublicIpOnLaunch: true`), and patches `AWSCluster.spec.network`
+     and `AWSMachine.spec.subnet`.
+  2. **Security Group (automatic creation & teardown when unused)**: Because AWS
+     Security Groups (`sg-...`) are VPC-scoped, a static default ID cannot exist.
+     When `AWSMachineTemplate` omits `additionalSecurityGroups`, the controller
+     automatically creates `cloud-provisioning-<cluster>` in the resolved VPC
+     (tagged `cloud-provisioning.appmana.com/managed-by=cloud-provisioning`),
+     authorizes inbound `UDP 51820` (`0.0.0.0/0` for WireGuard from on-premises)
+     and all-protocol (`-1`) self-ingress (for node/pod mesh traffic), and
+     attaches its `sg-...` ID to the `AWSMachine`. When the last
+     `ProvisionedNodeClaim` in the cluster is deleted, the controller
+     automatically deletes the security group once the instances terminate.
 
 The chart presents the cluster's own control plane to Cluster API: a
 `Cluster` whose `controlPlaneRef` names an `ImportedControlPlane`
@@ -258,16 +286,19 @@ go run ./controller/cmd/platform-tuple iam-render \
   --kubeconfig="$KUBECONFIG"
 
 # 2. Create/update all Customer Managed Policies, Roles, Instance Profile,
-#    and Kubernetes AWSClusterRoleIdentity using the developer's AWS credentials:
-go run ./controller/cmd/platform-tuple iam-apply \
+#    and Kubernetes AWSClusterRoleIdentity using the developer's AWS credentials
+#    (pass --create-vpc to also provision an isolated tagged VPC + public Subnet + IGW + SG):
+endpoint-controller iam apply \
   --tuple="k0s + calico,bgp,windows + aws,aws-vpc" \
-  --aws-cluster=my-cluster \
-  --aws-region=us-west-2 \
-  --aws-cluster-role-identity=aws-role-identity \
+  --cluster=my-cluster \
+  --region=us-west-2 \
+  --cluster-role-identity=aws-role-identity \
+  --source-identity=aws-static-creds \
   --kubeconfig="$KUBECONFIG"
 
-# Or via the endpoint-controller binary directly:
-endpoint-controller iam apply \
+# 3. Tear down all owned IAM roles, policies, instance profile, and any
+#    controller-managed VPC/Subnet/IGW/SecurityGroup resources:
+endpoint-controller iam cleanup \
   --tuple="k0s + calico,bgp,windows + aws,aws-vpc" \
   --cluster=my-cluster \
   --region=us-west-2 \

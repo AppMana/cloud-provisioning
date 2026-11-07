@@ -61,8 +61,14 @@ spec:
       securityContext:
         fsGroup: 65532
       {{- end }}
-      {{- if or .Values.awsGateway.configMap $awsFiles $receipts }}
+      {{- $webhookEnabled := and .Values.webhook .Values.webhook.enabled }}
+      {{- if or .Values.awsGateway.configMap $awsFiles $receipts $webhookEnabled }}
       volumes:
+        {{- if $webhookEnabled }}
+        - name: webhook-tls
+          secret:
+            secretName: {{ include "cloud-provisioning.webhookTLSSecret" . | quote }}
+        {{- end }}
         {{- if $receipts }}
         - name: receipt-tls
           secret:
@@ -85,8 +91,13 @@ spec:
         - name: controller
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if or .Values.awsGateway.configMap $awsFiles $receipts }}
+          {{- if or .Values.awsGateway.configMap $awsFiles $receipts $webhookEnabled }}
           volumeMounts:
+            {{- if $webhookEnabled }}
+            - name: webhook-tls
+              mountPath: /etc/cloud-provisioning/webhook
+              readOnly: true
+            {{- end }}
             {{- if $receipts }}
             - name: receipt-tls
               mountPath: /etc/cloud-provisioning/receipts
@@ -138,8 +149,32 @@ spec:
             {{- with .Values.platforms.aws.vpcCNI.windows.pullSecrets }}
             - "--aws-windows-ipam-pull-secrets={{ join "," . }}"
             {{- end }}
-            {{- if .Values.experimentalNodeGroups }}
-            - "--experimental-node-groups=true"
+            {{- if eq (include "cloud-provisioning.nodeGroupsEnabled" .) "true" }}
+            - "--node-groups=true"
+            {{- else }}
+            - "--node-groups=false"
+            {{- end }}
+            {{- if $webhookEnabled }}
+            - {{ printf "--webhook-bind-address=:%v" (.Values.webhook.port | default 9443) | quote }}
+            - "--webhook-cert-dir=/etc/cloud-provisioning/webhook"
+            {{- with .Values.webhook.aws.securityGroupID }}
+            - {{ printf "--webhook-aws-security-group-id=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.webhook.aws.securityGroupName }}
+            - {{ printf "--webhook-aws-security-group-name=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.webhook.aws.iamInstanceProfile }}
+            - {{ printf "--webhook-aws-iam-instance-profile=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.webhook.aws.sshKeyName }}
+            - {{ printf "--webhook-aws-ssh-key-name=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.webhook.aws.identityName }}
+            - {{ printf "--webhook-aws-identity-name=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.webhook.gcp.networkTag }}
+            - {{ printf "--webhook-gcp-network-tag=%s" . | quote }}
+            {{- end }}
             {{- end }}
             {{- if .Values.awsGateway.configMap }}
             - "--aws-gateway-config=/etc/cloud-provisioning/gateway/scope.json"

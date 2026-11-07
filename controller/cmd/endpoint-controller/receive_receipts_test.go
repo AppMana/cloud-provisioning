@@ -115,6 +115,9 @@ func TestReceiptChartServingConfiguration(t *testing.T) {
 				}
 				switch object.GetKind() {
 				case "Service":
+					if !strings.HasSuffix(object.GetName(), "-receipts") {
+						continue
+					}
 					var serviceObject corev1.Service
 					if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &serviceObject); err != nil {
 						t.Fatal(err)

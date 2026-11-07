@@ -76,8 +76,8 @@ type ProvisionedNodeGroupClaimStatus struct {
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// ProvisionedNodeGroupClaim is experimental until its lifecycle controller and
-// VM acceptance suite are complete. Its CRD currently lives with API test data.
+// ProvisionedNodeGroupClaim reconciles a ReplicaSet-style pool of
+// ProvisionedNodeClaim children with ordered scale-up and safe scale-down.
 type ProvisionedNodeGroupClaim struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

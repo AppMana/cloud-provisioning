@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// Register enables experimental node groups for one mesh namespace. The current
-// deployment manages CAPI and workload objects through the same cluster API.
+// Register enables ProvisionedNodeGroupClaim reconciliation for one mesh namespace.
+// The deployment manages CAPI and workload objects through the same cluster API.
 func Register(mgr ctrl.Manager, namespace, mesh, apiVIP, apiPort, bootstrapFormat string, retirementAge ...time.Duration) error {
 	if mgr == nil || namespace == "" || mesh == "" || apiPort == "" {
 		return fmt.Errorf("manager, namespace, mesh and API port required")

@@ -1,30 +1,27 @@
 # Provisioned node groups
 
-Status: experimental API and claim reconciler; the current `ProvisionedNodeClaim`
-provisions one machine. Group orchestration requires explicit enablement and
-remains under development.
+`ProvisionedNodeGroupClaim` (`pngc`) manages a ReplicaSet-style pool of
+`ProvisionedNodeClaim` children (`replicas`, `scale` subresource for HPA/KEDA,
+and ordered scale-down with node cordoning, workload eviction, and WireGuard
+peer withdrawal). Node groups are enabled by default (`nodeGroups: true`).
 
-## Enable in an isolated harness
+## Configuration
 
-The chart installs the experimental API contract. Enable the controller on the
-harness release using its existing values and a newly built controller image:
+The chart installs the `ProvisionedNodeGroupClaim` CRD and enables the
+controller by default (`nodeGroups: true`):
 
 ```sh
-helm upgrade cloud-provisioning charts/cloud-provisioning \
-  --namespace cloud-provisioning --reuse-values \
-  --set experimentalNodeGroups=true \
+helm upgrade --install cloud-provisioning charts/cloud-provisioning \
+  --namespace cloud-provisioning \
   --set image.tag=YOUR_TESTED_BUILD_TAG
 ```
 
 Confirm the chart's image repository and tag match the build available to the
 VMs. The group controller shares the existing mesh leader election and watches
-its release namespace. CAPI and workload Nodes must be in this cluster API;
-separate management/workload cluster registration remains to be implemented.
-The value adds group status and child creation/deletion permissions in the
-release namespace, plus pod listing and eviction permissions for workload drain.
-It defaults to `false`; the group CRD is installed with the chart either way.
-KEDA-driven scaling has native Linux k0s/Calico VM coverage. Broader distribution,
-Windows, and real-cloud group qualification remain pending.
+its release namespace. CAPI and workload Nodes live in the same cluster API.
+The chart grants group status and child creation/deletion permissions in the
+release namespace, plus pod listing and eviction permissions for workload drain
+(set `nodeGroups: false` to disable group reconciliation and drain RBAC).
 
 ## Pooled VM provider
 

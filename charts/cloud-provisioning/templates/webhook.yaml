@@ -1,0 +1,95 @@
+{{- if and .Values.webhook .Values.webhook.enabled }}
+{{- $svcName := printf "%s-webhook" (include "cloud-provisioning.controllerName" .) }}
+{{- $secretName := include "cloud-provisioning.webhookTLSSecret" . }}
+{{- $port := .Values.webhook.port | default 9443 | int }}
+{{- $altNames := list $svcName (printf "%s.%s" $svcName .Release.Namespace) (printf "%s.%s.svc" $svcName .Release.Namespace) (printf "%s.%s.svc.cluster.local" $svcName .Release.Namespace) }}
+{{- $ca := genCA (printf "%s-ca" $svcName) 3650 }}
+{{- $cert := genSignedCert $svcName nil $altNames 3650 $ca }}
+{{- $caBundle := b64enc $ca.Cert }}
+{{- $tlsCrt := b64enc $cert.Cert }}
+{{- $tlsKey := b64enc $cert.Key }}
+{{- $existingSecret := (lookup "v1" "Secret" .Release.Namespace $secretName) }}
+{{- if and $existingSecret $existingSecret.data }}
+{{- if and (index $existingSecret.data "ca.crt") (index $existingSecret.data "tls.crt") (index $existingSecret.data "tls.key") }}
+{{- $caBundle = index $existingSecret.data "ca.crt" }}
+{{- $tlsCrt = index $existingSecret.data "tls.crt" }}
+{{- $tlsKey = index $existingSecret.data "tls.key" }}
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  ca.crt: {{ $caBundle }}
+  tls.crt: {{ $tlsCrt }}
+  tls.key: {{ $tlsKey }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svcName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ include "cloud-provisioning.controllerName" . }}
+  ports:
+    - name: https-webhook
+      port: 443
+      targetPort: {{ $port }}
+      protocol: TCP
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ $svcName }}
+  labels:
+    {{- include "cloud-provisioning.labels" . | nindent 4 }}
+webhooks:
+  - name: mutate.cloud-provisioning.appmana.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: {{ .Values.webhook.failurePolicy | default "Ignore" }}
+    timeoutSeconds: 5
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Release.Namespace }}
+    clientConfig:
+      caBundle: {{ $caBundle }}
+      service:
+        name: {{ $svcName }}
+        namespace: {{ .Release.Namespace }}
+        path: /mutate
+        port: 443
+    rules:
+      - apiGroups: ["infrastructure.cluster.x-k8s.io"]
+        apiVersions: ["v1beta2", "v1beta1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - awsmachinetemplates
+          - awsmachines
+          - gcpmachinetemplates
+          - gcpmachines
+          - azuremachinetemplates
+          - azuremachines
+          - awsclusters
+          - gcpclusters
+          - azureclusters
+      - apiGroups: ["cluster.x-k8s.io"]
+        apiVersions: ["v1beta2", "v1beta1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - clusters
+      - apiGroups: ["cloud-provisioning.appmana.com"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources:
+          - provisionednodeclaims
+          - provisionednodegroupclaims
+{{- end }}

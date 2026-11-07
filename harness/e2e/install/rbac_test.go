@@ -40,9 +40,11 @@ func TestControllerDrainPermissions(t *testing.T) {
 		drain         bool
 		groups        bool
 	}{
-		{name: "ordinary"},
-		{name: "standalone-journal", setting: "tunnel.receivePreparation.journal.clusterUID=fixture", drain: true},
-		{name: "groups", setting: "experimentalNodeGroups=true", drain: true, groups: true},
+		{name: "default", drain: true, groups: true},
+		{name: "groups-disabled", setting: "nodeGroups=false", drain: false, groups: false},
+		{name: "legacy-flag-disabled", setting: "experimentalNodeGroups=false", drain: false, groups: false},
+		{name: "standalone-journal", setting: "nodeGroups=false,tunnel.receivePreparation.journal.clusterUID=fixture", drain: true, groups: false},
+		{name: "groups", setting: "nodeGroups=true", drain: true, groups: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			args := []string{"template", "test", chart}

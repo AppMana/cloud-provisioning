@@ -57,6 +57,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	tuplecli "github.com/appmana/cloud-provisioning/controller/pkg/tuple/cli"
+	"github.com/appmana/cloud-provisioning/controller/pkg/webhook"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -661,7 +662,17 @@ func main() {
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
-	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
+	nodeGroups := true
+	flag.BoolVar(&nodeGroups, "node-groups", true, "reconcile ProvisionedNodeGroupClaim resources in the mesh namespace")
+	flag.BoolVar(&nodeGroups, "experimental-node-groups", true, "deprecated alias for --node-groups")
+	webhookBindAddr := flag.String("webhook-bind-address", "", "HTTPS bind address for the mutating admission webhook (e.g. :9443; empty disables it)")
+	webhookCertDir := flag.String("webhook-cert-dir", "/etc/cloud-provisioning/webhook", "directory containing tls.crt and tls.key for the mutating admission webhook")
+	webhookAWSSecurityGroupID := flag.String("webhook-aws-security-group-id", "", "comma-separated AWS security group IDs automatically patched into AWSMachineTemplate/AWSMachine for on-premises WireGuard connections")
+	webhookAWSSecurityGroupName := flag.String("webhook-aws-security-group-name", "", "optional AWS security group name filter automatically patched into AWSMachineTemplate/AWSMachine for on-premises WireGuard connections")
+	webhookAWSIAMInstanceProfile := flag.String("webhook-aws-iam-instance-profile", "", "optional default EC2 IAM instance profile name for AWSMachineTemplate/AWSMachine")
+	webhookAWSSSHKeyName := flag.String("webhook-aws-ssh-key-name", "", "optional default EC2 SSH keypair name for AWSMachineTemplate/AWSMachine")
+	webhookAWSIdentityName := flag.String("webhook-aws-identity-name", "", "optional default AWSClusterStaticIdentity or AWSClusterRoleIdentity name for AWSCluster")
+	webhookGCPNetworkTag := flag.String("webhook-gcp-network-tag", "", "optional GCE network tag automatically patched into GCPMachineTemplate/GCPMachine for the WireGuard firewall rule")
 	vpcCNIFamily := flag.String("aws-vpc-cni-family", "ipv4", "the AWS VPC CNI's pod address family, ipv4 or ipv6")
 	artifactRegion := flag.String("artifact-region", "", "region of the S3 bucket s3:// artifact sources name; the controller signs them when it renders a bootstrap")
 	vpcCNI := flag.Bool("aws-vpc-cni", true, "apply the AWS VPC CNI (aws-node) for AWS VPC CNI nodes, configured from the site's ranges")
@@ -908,8 +919,24 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "aws-iam-bootstrap: reconciled %d changes for cluster %s (%s)\n", len(report.Changes), report.ClusterName, report.AccountID)
 	}
-	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName, EC2: awsSDK.API, WindowsIPAM: *vpcCNI && *windowsIPAMImage != ""}
-	gcpProvider := joingcp.Provider{}
+	var configuredSGIDs []string
+	for _, rawID := range strings.Split(*webhookAWSSecurityGroupID, ",") {
+		if id := strings.TrimSpace(rawID); id != "" {
+			configuredSGIDs = append(configuredSGIDs, id)
+		}
+	}
+	awsProvider := joinaws.Provider{
+		ConfigNamespace:    awsConfigNamespace,
+		ConfigName:         awsConfigName,
+		Reader:             mgr.GetAPIReader(),
+		SecurityGroupIDs:   configuredSGIDs,
+		SecurityGroupName:  strings.TrimSpace(*webhookAWSSecurityGroupName),
+		IAMInstanceProfile: strings.TrimSpace(*webhookAWSIAMInstanceProfile),
+		SSHKeyName:         strings.TrimSpace(*webhookAWSSSHKeyName),
+		EC2:                awsSDK.API,
+		WindowsIPAM:        *vpcCNI && *windowsIPAMImage != "",
+	}
+	gcpProvider := joingcp.Provider{NetworkTag: strings.TrimSpace(*webhookGCPNetworkTag)}
 	dockerProvider := joindocker.Provider{}
 	// Adopts a container someone else owns, which is how a lab topology
 	// presents a machine. Shipped like the docker provider rather than
@@ -1215,9 +1242,9 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if *nodeGroups {
+	if nodeGroups {
 		if !joinEnabled {
-			fmt.Fprintln(os.Stderr, "experimental node groups require --join-enabled")
+			fmt.Fprintln(os.Stderr, "node groups require --join-enabled")
 			os.Exit(1)
 		}
 		retirementAge := time.Minute
@@ -1226,6 +1253,24 @@ func main() {
 		}
 		if err := nodegroup.Register(mgr, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress), bootstrapSecretNameFormat, retirementAge); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register node groups: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	if strings.TrimSpace(*webhookBindAddr) != "" && strings.TrimSpace(*webhookBindAddr) != "0" {
+		if err := mgr.Add(&webhook.Server{
+			BindAddress: strings.TrimSpace(*webhookBindAddr),
+			CertDir:     strings.TrimSpace(*webhookCertDir),
+			Mutator: &webhook.Mutator{
+				Reader:           mgr.GetAPIReader(),
+				ManagedNamespace: secretNamespace,
+				AWSProvider:      awsProvider,
+				AWSIdentityName:  strings.TrimSpace(*webhookAWSIdentityName),
+				GCPNetworkTag:    strings.TrimSpace(*webhookGCPNetworkTag),
+				APIVIP:           joinAPIVIP,
+				APIServerPort:    apiServerPortOf(joinAPIAddress),
+			},
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "unable to register admission webhook server: %v\n", err)
 			os.Exit(1)
 		}
 	}

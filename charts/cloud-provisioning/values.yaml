@@ -378,7 +378,42 @@ platforms:
         ipamImage: ""
         pullSecrets: []
 
-# Reconcile the experimental ProvisionedNodeGroupClaim API, whose CRD the
-# chart installs.
-experimentalNodeGroups: false
+# Reconcile the ProvisionedNodeGroupClaim API (ReplicaSet-style pools of
+# cloud worker nodes), whose CRD the chart installs.
+nodeGroups: true
+experimentalNodeGroups: true
+
+# Mutating admission webhook that automatically patches in defaults so
+# machine templates, clusters, and claims do not need stand-in IDs:
+#   - AWSMachineTemplate / AWSMachine: patches in the security group needed
+#     for on-premises WireGuard connections, defaults publicIP: true,
+#     iamInstanceProfile, cloudInit.insecureSkipSecretsManager: true, and
+#     Canonical's official Ubuntu 24.04 LTS AMI lookup when ami/subnet are omitted.
+#   - GCPMachineTemplate / GCPMachine: defaults publicIP: true, official Ubuntu
+#     24.04 LTS imageFamily, the Debian/RHEL startup-script cloud-init bridge,
+#     and optional GCE firewall network tag.
+#   - AzureMachineTemplate / AzureMachine: defaults allocatePublicIP: true.
+#   - Cluster / AWSCluster / GCPCluster / AzureCluster: stamps
+#     cluster.x-k8s.io/managed-by: "external" and defaults controlPlaneEndpoint.
+#   - ProvisionedNodeClaim / ProvisionedNodeGroupClaim: defaults apiGroup,
+#     normalizes machine kinds to *Template, resolves clusterName when omitted,
+#     and defaults ProvisionedNodeGroupClaim.spec.replicas to 1.
+webhook:
+  enabled: true
+  port: 9443
+  failurePolicy: Ignore
+  aws:
+    # Comma-separated security group IDs (e.g. "sg-0123456789abcdef0") or
+    # securityGroupName filter automatically patched into AWSMachineTemplate
+    # and AWSMachine for on-premises WireGuard UDP 51820 connections.
+    securityGroupID: ""
+    securityGroupName: ""
+    iamInstanceProfile: ""
+    sshKeyName: ""
+    identityName: ""
+  gcp:
+    # Optional GCE network tag patched into GCPMachineTemplate/GCPMachine
+    # for the WireGuard firewall rule.
+    networkTag: ""
+
 

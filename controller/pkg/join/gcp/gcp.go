@@ -19,7 +19,9 @@ import (
 // defaults (publicIP, stock Ubuntu imageFamily fallback, and a startup-script
 // bridge so stock GCE Debian/RHEL images without cloud-init still execute
 // CAPG's user-data #cloud-config).
-type Provider struct{}
+type Provider struct {
+	NetworkTag string
+}
 
 var (
 	// CAPG (cluster-api-provider-gcp) serves infrastructure.cluster.x-k8s.io/v1beta1.
@@ -78,7 +80,7 @@ func (Provider) GVK() schema.GroupVersionKind { return gvk }
 func (Provider) ClusterGVK() schema.GroupVersionKind { return gcpClusterGVK }
 
 // PrepareInfraMachine implements join.InfraMachinePreparer for GCPMachine.
-func (Provider) PrepareInfraMachine(gcpMachine *unstructured.Unstructured) (string, error) {
+func (p Provider) PrepareInfraMachine(gcpMachine *unstructured.Unstructured) (string, error) {
 	if gcpMachine == nil {
 		return "", nil
 	}
@@ -93,36 +95,42 @@ func (Provider) PrepareInfraMachine(gcpMachine *unstructured.Unstructured) (stri
 		}
 		unstructured.RemoveNestedField(gcpMachine.Object, "spec", "failureDomain")
 	}
-
-	// Default publicIP to true: on an externally-managed GCPCluster there is no
-	// CAPG-provisioned Cloud NAT, and the on-premises WireGuard dialer needs a
-	// routable ExternalIP (ONE_TO_ONE_NAT AccessConfig) on the GCE VM.
-	if _, found, _ := unstructured.NestedBool(gcpMachine.Object, "spec", "publicIP"); !found {
-		if err := unstructured.SetNestedField(gcpMachine.Object, true, "spec", "publicIP"); err != nil {
-			return "", err
-		}
+	spec, _ := gcpMachine.Object["spec"].(map[string]any)
+	if spec == nil {
+		spec = map[string]any{}
+		gcpMachine.Object["spec"] = spec
 	}
+	arch := gcpMachine.GetLabels()["cloud-provisioning.appmana.com/arch"]
+	if err := PrepareGCPMachineSpec(spec, arch, p.NetworkTag); err != nil {
+		return "", err
+	}
+	return failureDomain, nil
+}
 
-	// Default imageFamily to official Ubuntu 24.04 LTS if neither image nor
-	// imageFamily is specified (CAPG otherwise defaults to a custom
-	// projects/<project>/global/images/family/capi-ubuntu-1804-k8s-* family).
-	img, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "image")
-	imgFamily, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "imageFamily")
+// PrepareGCPMachineSpec populates defaults on a GCPMachine spec (or
+// GCPMachineTemplate.spec.template.spec):
+//   - publicIP: true
+//   - imageFamily: projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-<arch>
+//   - additionalMetadata: startup-script cloud-init bridge for Debian/RHEL
+//   - additionalNetworkTags: optional WireGuard firewall network tag
+func PrepareGCPMachineSpec(spec map[string]any, archLabel, networkTag string) error {
+	if spec == nil {
+		return nil
+	}
+	if _, found := spec["publicIP"]; !found {
+		spec["publicIP"] = true
+	}
+	img, _ := spec["image"].(string)
+	imgFamily, _ := spec["imageFamily"].(string)
 	if strings.TrimSpace(img) == "" && strings.TrimSpace(imgFamily) == "" {
-		instType, _, _ := unstructured.NestedString(gcpMachine.Object, "spec", "instanceType")
+		instType, _ := spec["instanceType"].(string)
 		defaultFamily := DefaultImageFamilyAMD64
-		if isARM64InstanceType(instType) || gcpMachine.GetLabels()["cloud-provisioning.appmana.com/arch"] == "arm64" {
+		if isARM64InstanceType(instType) || archLabel == "arm64" {
 			defaultFamily = DefaultImageFamilyARM64
 		}
-		if err := unstructured.SetNestedField(gcpMachine.Object, defaultFamily, "spec", "imageFamily"); err != nil {
-			return "", err
-		}
+		spec["imageFamily"] = defaultFamily
 	}
-
-	// Ensure startup-script cloud-init bridge is present so stock Debian 12 and
-	// RHEL/Rocky GCE images (which only run google-guest-agent) install and invoke
-	// cloud-init to process CAPG's user-data #cloud-config.
-	items, _, _ := unstructured.NestedSlice(gcpMachine.Object, "spec", "additionalMetadata")
+	items, _ := spec["additionalMetadata"].([]any)
 	hasStartupScript := false
 	for _, raw := range items {
 		if m, ok := raw.(map[string]any); ok && m["key"] == "startup-script" {
@@ -135,12 +143,22 @@ func (Provider) PrepareInfraMachine(gcpMachine *unstructured.Unstructured) (stri
 			"key":   "startup-script",
 			"value": BootstrapStartupScript,
 		})
-		if err := unstructured.SetNestedSlice(gcpMachine.Object, items, "spec", "additionalMetadata"); err != nil {
-			return "", err
+		spec["additionalMetadata"] = items
+	}
+	if tag := strings.TrimSpace(networkTag); tag != "" {
+		tags, _ := spec["additionalNetworkTags"].([]any)
+		hasTag := false
+		for _, t := range tags {
+			if ts, ok := t.(string); ok && ts == tag {
+				hasTag = true
+				break
+			}
+		}
+		if !hasTag {
+			spec["additionalNetworkTags"] = append(tags, tag)
 		}
 	}
-
-	return failureDomain, nil
+	return nil
 }
 
 func isARM64InstanceType(instanceType string) bool {

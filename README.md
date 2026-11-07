@@ -37,9 +37,8 @@ spec:
   values:
     # joinProvider (k0s, k3s, rke2, microk8s, kubeadm), site CNI, and API address
     # are inferred automatically from the cluster at startup.
-
-    # Enable ProvisionedNodeGroupClaim (ReplicaSet of cloud nodes):
-    experimentalNodeGroups: true
+    # ProvisionedNodeGroupClaim (nodeGroups: true) and the mutating admission
+    # webhook (webhook.enabled: true) are enabled by default.
 
     # Remote cloud nodes ALWAYS run the WireGuard tunnel.
     # tunnel.endpoints only chooses which on-premises Linux nodes terminate tunnels:
@@ -53,6 +52,15 @@ spec:
     #     bgpPort: 1790
     tunnel:
       endpoints: "all"
+
+    # Mutating admission webhook: automatically patches the WireGuard security
+    # group (allowing inbound UDP 51820 from on-premises), Ubuntu 24.04 LTS AMI
+    # lookup, IAM instance profile, `publicIP: true`, and `managed-by: external`
+    # into MachineTemplates, Clusters, and Claims so manifests need no stand-in IDs.
+    webhook:
+      aws:
+        securityGroupName: "cloud-provisioning-tunnel" # or securityGroupID: "sg-..."
+        identityName: "site-aws-identity"
 
     # Optional: allow preflight checks to verify CAPI provider Secrets in their
     # manager namespaces (e.g. CAPA in capa-system, CAPG in capg-system):
@@ -102,32 +110,33 @@ spec:
     list:
       - cloud-provisioning
 ---
+# The admission webhook automatically stamps `cluster.x-k8s.io/managed-by: external`,
+# fills `controlPlaneEndpoint` from the on-premises API VIP, and defaults `identityRef`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSCluster
 metadata:
   name: site-aws
   namespace: cloud-provisioning
-  annotations:
-    cluster.x-k8s.io/managed-by: external # On-prem control plane is external to CAPI
 spec:
   region: us-west-2
-  identityRef:
-    kind: AWSClusterStaticIdentity
-    name: site-aws-identity
 ---
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
 metadata:
   name: site-aws
   namespace: cloud-provisioning
-  annotations:
-    cluster.x-k8s.io/managed-by: external
 spec:
   infrastructureRef:
-    apiGroup: infrastructure.cluster.x-k8s.io
     kind: AWSCluster
     name: site-aws
 ---
+# No hardcoded AMI ID, subnet ID, or security group ID is needed:
+# - `additionalSecurityGroups`: patched in automatically by the admission webhook
+#   from `webhook.aws.securityGroupName` / `webhook.aws.securityGroupID`.
+# - `ami`: defaults automatically to Canonical's official Ubuntu 24.04 LTS AMI
+#   lookup (`099720109477` / `ubuntu-noble-24.04`) matching `amd64` or `arm64`.
+# - `subnet`: omitted so CAPA automatically selects a subnet from `AWSCluster`.
+# - `iamInstanceProfile`: defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
@@ -143,13 +152,12 @@ spec:
         cloud-provisioning.appmana.com/cni: site
     spec:
       instanceType: t3.large
-      iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
-      ami:
-        id: ami-0abcdef1234567890
-      subnet:
-        id: subnet-0123456789abcdef0
-      additionalSecurityGroups:
-        - id: sg-0123456789abcdef0 # Must allow inbound UDP 51820 from on-prem
+      # Why `publicIP: true` is required (and defaulted by the admission webhook):
+      # The on-premises cluster is private (behind NAT/firewalls with no inbound
+      # ports open and no public control-plane endpoint). On-premises WireGuard
+      # dialers initiate outbound UDP 51820 connections to the cloud worker's
+      # public IP; once the tunnel handshake completes, all Kubernetes API and
+      # pod traffic flows inside the encrypted tunnel.
       publicIP: true
 ---
 # --- Option A: Single Cloud Worker Node (ProvisionedNodeClaim) ---
@@ -162,9 +170,7 @@ metadata:
   name: aws-worker-1
   namespace: cloud-provisioning
 spec:
-  clusterName: site-aws
   infrastructureRef:
-    apiGroup: infrastructure.cluster.x-k8s.io
     kind: AWSMachineTemplate
     name: aws-ubuntu-amd64
 ---
@@ -191,9 +197,7 @@ spec:
 
   template:
     spec:
-      clusterName: site-aws
       infrastructureRef:
-        apiGroup: infrastructure.cluster.x-k8s.io
         kind: AWSMachineTemplate
         name: aws-ubuntu-amd64
 ```
@@ -205,7 +209,7 @@ Multiple CAPI providers can run side by side in the same namespace
 
 | Provider | Package | Specialization |
 | --- | --- | --- |
-| AWS (`AWSMachine`) | `controller/pkg/join/aws` | EC2 IMDSv2 identity, CAPA `capa-system` Secret & SG validation, optional `aws-vpc` CNI |
+| AWS (`AWSMachine`) | `controller/pkg/join/aws` | EC2 IMDSv2 identity, webhook SG/AMI/profile defaults, CAPA `capa-system` Secret & SG validation, optional `aws-vpc` CNI |
 | GCP (`GCPMachine`) | `controller/pkg/join/gcp` | GCE metadata identity, `credentialsRef` check, `publicIP`/`imageFamily`/`failureDomain` defaults, `startup-script` `cloud-init` bridge |
 | Generic CAPI (`*Machine`) | `controller/pkg/join/generic` | Any `<Kind>Template` / `<Kind>Cluster` (e.g. CAPZ `AzureMachine`) |
 | Labcontainers / Docker | `controller/pkg/join/labcontainers`, `controller/pkg/join/docker` | Simulated WAN VMs and containers for e2e tests |

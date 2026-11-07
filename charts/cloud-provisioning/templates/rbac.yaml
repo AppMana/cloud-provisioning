@@ -34,13 +34,14 @@ rules:
     resources: ["tokenreviews"]
     verbs: ["create"]
   {{- end }}
-  {{- if .Values.experimentalNodeGroups }}
+  {{- $nodeGroups := eq (include "cloud-provisioning.nodeGroupsEnabled" .) "true" }}
+  {{- if $nodeGroups }}
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodegroupclaims"]
     verbs: ["get", "list", "watch"]
   {{- end }}
   {{- /* Standalone claims also drain workloads when receiver journals exist. */}}
-  {{- if or .Values.experimentalNodeGroups (and .Values.tunnel.receivePreparation .Values.tunnel.receivePreparation.journal) }}
+  {{- if or $nodeGroups (and .Values.tunnel.receivePreparation .Values.tunnel.receivePreparation.journal) }}
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]
@@ -228,7 +229,7 @@ metadata:
   name: {{ include "cloud-provisioning.controllerName" . }}
   namespace: {{ .Release.Namespace }}
 rules:
-  {{- if .Values.experimentalNodeGroups }}
+  {{- if eq (include "cloud-provisioning.nodeGroupsEnabled" .) "true" }}
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodegroupclaims", "provisionednodegroupclaims/status", "provisionednodegroupclaims/finalizers"]
     verbs: ["update", "patch"]

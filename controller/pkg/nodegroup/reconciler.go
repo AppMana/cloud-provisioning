@@ -20,7 +20,6 @@ const GroupFinalizer = "cloud-provisioning.appmana.com/node-group"
 
 // Reconciler orchestrates claims independently of their machine provider. API
 // must bypass the cache so planning observes completed creation and deletion.
-// Manager registration requires the explicit experimental-node-groups flag.
 type Reconciler struct {
 	RetirementAPI             kubernetes.Interface
 	RetirementMaxAge          time.Duration

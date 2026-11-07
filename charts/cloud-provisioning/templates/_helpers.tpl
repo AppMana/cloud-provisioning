@@ -22,6 +22,14 @@ issues through cert-manager. */ -}}
 {{- default (printf "%s-receipts-tls" (include "cloud-provisioning.controllerName" .)) .Values.tunnel.receiptTLSSecret -}}
 {{- end -}}
 
+{{- define "cloud-provisioning.webhookTLSSecret" -}}
+{{ include "cloud-provisioning.controllerName" . }}-webhook-tls
+{{- end -}}
+
+{{- define "cloud-provisioning.nodeGroupsEnabled" -}}
+{{- if and .Values.nodeGroups .Values.experimentalNodeGroups -}}true{{- end -}}
+{{- end -}}
+
 {{- define "cloud-provisioning.image" -}}
 {{ include "cloud-provisioning.imageReference" (dict "image" .Values.image "defaultTag" .Chart.AppVersion) }}
 {{- end -}}

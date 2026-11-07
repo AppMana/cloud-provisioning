@@ -1,7 +1,5 @@
-# ProvisionedNodeGroupClaim: a ReplicaSet of cloud worker nodes.
-#
-# Enable in HelmRelease values with:
-#   experimentalNodeGroups: true
+# ProvisionedNodeGroupClaim (shortName: pngc): a ReplicaSet of cloud worker nodes.
+# Enabled by default in the chart (nodeGroups: true).
 #
 # --- How AWS Credentials & Permissions Work ---
 # Two components talk to AWS when using CAPA:
@@ -18,7 +16,7 @@
 #    URLs (if used), and observes native AWS VPC CNI pod IP allocations.
 #    - In HelmRelease values, set `aws.credentials.secretName: aws-credentials`
 #      (a Secret in `cloud-provisioning` with keys AWS_ACCESS_KEY_ID,
-#      AWS_SECRET_ACCESS_KEY, AWS_REGION) and `providerManagerNamespace: capa-system`
+#      AWS_SECRET_ACCESS_KEY, AWS_REGION) and `providerManagerNamespaces: [capa-system]`
 #      so preflight checks can verify the CAPA Secret in `capa-system` exists.
 #    - Optional: set `aws.iamBootstrap.enabled: true` in HelmRelease values to
 #      automatically create/update the required IAM roles, instance profiles,
@@ -43,6 +41,9 @@ spec:
     list:
       - cloud-provisioning
 ---
+# The mutating admission webhook automatically stamps
+# `cluster.x-k8s.io/managed-by: external` and populates `controlPlaneEndpoint`
+# from the on-premises API server on AWSCluster and Cluster.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSCluster
 metadata:
@@ -69,6 +70,14 @@ spec:
     kind: AWSCluster
     name: site-aws
 ---
+# No hardcoded AMI ID, subnet ID, or security group ID is needed in the template:
+# - `additionalSecurityGroups`: patched in automatically by the admission webhook
+#   from `webhook.aws.securityGroupID` / `webhook.aws.securityGroupName` in the
+#   HelmRelease (allowing inbound UDP 51820 from on-premises).
+# - `ami`: defaults automatically to Canonical's official Ubuntu 24.04 LTS AMI
+#   lookup (`099720109477` / `ubuntu-noble-24.04`) matching `amd64` or `arm64`.
+# - `subnet`: omitted so CAPA automatically selects a subnet from `AWSCluster`.
+# - `iamInstanceProfile`: defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
@@ -83,13 +92,12 @@ spec:
         cloud-provisioning.appmana.com/cni: site
     spec:
       instanceType: t3.large
-      iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
-      ami:
-        id: ami-0abcdef1234567890
-      subnet:
-        id: subnet-0123456789abcdef0
-      additionalSecurityGroups:
-        - id: sg-0123456789abcdef0 # Must allow inbound UDP 51820 from on-prem
+      # Why `publicIP: true` is required (and defaulted by the admission webhook):
+      # The on-premises cluster sits behind NAT/firewalls with no public control-plane
+      # endpoint and no inbound ports open. On-premises WireGuard dialers initiate
+      # outbound UDP 51820 connections to the cloud worker's public IP; once the
+      # WireGuard handshake completes, all Kubernetes API and pod traffic flows
+      # inside the encrypted tunnel.
       publicIP: true
 ---
 # --- ProvisionedNodeGroupClaim (shortName: pngc) ---

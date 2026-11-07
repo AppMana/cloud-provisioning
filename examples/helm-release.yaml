@@ -27,7 +27,14 @@ spec:
   values:
     # joinProvider (k0s, k3s, rke2, microk8s, kubeadm), site CNI, and API address
     # are inferred automatically from the cluster at startup.
+    # ProvisionedNodeGroupClaim (nodeGroups: true) and the mutating admission
+    # webhook (webhook.enabled: true) are enabled by default.
     tunnel:
       # "all" (the default) places the tunnel on every on-premises Linux node
       # alongside all remote cloud workers (full mesh).
       endpoints: "all"
+    webhook:
+      aws:
+        # Optional: security group name or ID allowing inbound UDP 51820 from
+        # on-premises; automatically patched into every AWSMachineTemplate/AWSMachine.
+        securityGroupName: "cloud-provisioning-tunnel"

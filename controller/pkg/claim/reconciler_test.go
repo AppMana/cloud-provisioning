@@ -830,6 +830,7 @@ type fakeEC2Network struct {
 	sgs        map[string]*fakeEC2SecurityGroup
 	createdSGs []string
 	deletedSGs []string
+	ipv6Only   bool
 }
 
 func newFakeEC2Network() *fakeEC2Network {
@@ -847,23 +848,38 @@ func (f *fakeEC2Network) ProviderFunc() func(context.Context, string) (attachmen
 func (f *fakeEC2Network) Call(_ context.Context, _, op string, input map[string]any) (json.RawMessage, error) {
 	switch op {
 	case "describe-vpcs":
+		vpc := map[string]any{"VpcId": "vpc-0default1234", "IsDefault": true, "State": "available"}
+		if f.ipv6Only {
+			vpc["Ipv6CidrBlockAssociationSet"] = []map[string]any{
+				{
+					"Ipv6CidrBlock":      "2600:1f14:abcd:ef00::/56",
+					"Ipv6CidrBlockState": map[string]any{"State": "associated"},
+				},
+			}
+		}
 		return json.Marshal(map[string]any{
-			"Vpcs": []map[string]any{
-				{"VpcId": "vpc-0default1234", "IsDefault": true, "State": "available"},
-			},
+			"Vpcs": []map[string]any{vpc},
 		})
 	case "describe-subnets":
-		return json.Marshal(map[string]any{
-			"Subnets": []map[string]any{
+		sub := map[string]any{
+			"SubnetId":            "subnet-0public1234",
+			"VpcId":               "vpc-0default1234",
+			"AvailabilityZone":    "us-west-2a",
+			"MapPublicIpOnLaunch": !f.ipv6Only,
+			"DefaultForAz":        true,
+			"State":               "available",
+		}
+		if f.ipv6Only {
+			sub["AssignIpv6AddressOnCreation"] = true
+			sub["Ipv6CidrBlockAssociationSet"] = []map[string]any{
 				{
-					"SubnetId":            "subnet-0public1234",
-					"VpcId":               "vpc-0default1234",
-					"AvailabilityZone":    "us-west-2a",
-					"MapPublicIpOnLaunch": true,
-					"DefaultForAz":        true,
-					"State":               "available",
+					"Ipv6CidrBlock":      "2600:1f14:abcd:ef00::/64",
+					"Ipv6CidrBlockState": map[string]any{"State": "associated"},
 				},
-			},
+			}
+		}
+		return json.Marshal(map[string]any{
+			"Subnets": []map[string]any{sub},
 		})
 	case "describe-security-groups":
 		if ids, ok := input["GroupIds"].([]string); ok {
@@ -1062,6 +1078,56 @@ func TestReconcile_AutoProvisionsVPCSubnetAndSecurityGroupAndTearsDownWhenUnused
 	}
 	if len(ec2Fake.deletedSGs) != 1 || ec2Fake.deletedSGs[0] != "sg-auto-cloud-provisioning-appmana" {
 		t.Fatalf("deletedSGs = %v, want [sg-auto-cloud-provisioning-appmana] deleted when unused", ec2Fake.deletedSGs)
+	}
+}
+
+func TestReconcile_IPv6SubnetAvoidsNATGatewayAndPublicIPv4(t *testing.T) {
+	ctx := context.Background()
+	claim := fakeClaim("ipv6-worker")
+	claim.UID = "uid-ipv6-worker"
+	r := newClaimReconciler(t, claim, fakeTemplate("ipv6-worker"), fakeCluster("appmana"), fakeNode())
+	ec2Fake := newFakeEC2Network()
+	ec2Fake.ipv6Only = true
+	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{
+		ConfigNamespace: "wg-dialer",
+		ConfigName:      "aws-provider-config",
+		EC2:             ec2Fake.ProviderFunc(),
+	}}
+
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatalf("reconcileClaim(ipv6-worker): %v", err)
+	}
+
+	awsMachine := &unstructured.Unstructured{}
+	awsMachine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(ctx, client.ObjectKey{Namespace: "default", Name: "ipv6-worker"}, awsMachine); err != nil {
+		t.Fatalf("getting AWSMachine: %v", err)
+	}
+	pubIP, found, _ := unstructured.NestedBool(awsMachine.Object, "spec", "publicIP")
+	if !found || pubIP {
+		t.Fatalf("AWSMachine spec.publicIP = %v (found=%v), want false on IPv6 subnet with MapPublicIpOnLaunch=false", pubIP, found)
+	}
+	assignV6, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "assignPrimaryIPv6")
+	if assignV6 != "enabled" {
+		t.Fatalf("AWSMachine spec.assignPrimaryIPv6 = %q, want enabled", assignV6)
+	}
+
+	awsCluster := &unstructured.Unstructured{}
+	awsCluster.SetGroupVersionKind(joinaws.Provider{}.ClusterGVK())
+	if err := r.Get(ctx, client.ObjectKey{Namespace: "default", Name: "appmana"}, awsCluster); err != nil {
+		t.Fatalf("getting AWSCluster: %v", err)
+	}
+	vpc6, _, _ := unstructured.NestedString(awsCluster.Object, "spec", "network", "vpc", "ipv6", "cidrBlock")
+	if vpc6 != "2600:1f14:abcd:ef00::/56" {
+		t.Fatalf("AWSCluster spec.network.vpc.ipv6.cidrBlock = %q, want 2600:1f14:abcd:ef00::/56", vpc6)
+	}
+	subnets, _, _ := unstructured.NestedSlice(awsCluster.Object, "spec", "network", "subnets")
+	if len(subnets) != 1 {
+		t.Fatalf("AWSCluster subnets = %v, want 1 entry", subnets)
+	}
+	sub0, _ := subnets[0].(map[string]any)
+	if sub0["ipv6CidrBlock"] != "2600:1f14:abcd:ef00::/64" || sub0["isIpv6"] != true {
+		t.Fatalf("AWSCluster subnet[0] = %v, want ipv6CidrBlock=2600:1f14:abcd:ef00::/64 and isIpv6=true", sub0)
 	}
 }
 

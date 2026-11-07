@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"slices"
 	"strings"
 
@@ -93,6 +94,16 @@ func (p Provider) EnsureMachineNetwork(ctx context.Context, c client.Client, rea
 		awsMachine.Object["spec"] = spec
 	}
 	arch := awsMachine.GetLabels()["cloud-provisioning.appmana.com/arch"]
+	_, hasPublicIP := spec["publicIP"]
+	defaultedPublicIP := !hasPublicIP || awsMachine.GetAnnotations()["cloud-provisioning.appmana.com/defaulted-public-ip"] == "true"
+	if anns := awsMachine.GetAnnotations(); anns["cloud-provisioning.appmana.com/defaulted-public-ip"] != "" {
+		delete(anns, "cloud-provisioning.appmana.com/defaulted-public-ip")
+		if len(anns) == 0 {
+			awsMachine.SetAnnotations(nil)
+		} else {
+			awsMachine.SetAnnotations(anns)
+		}
+	}
 	if defaults.AMIAMD64 != "" || defaults.AMIARM64 != "" {
 		if org, _ := spec["imageLookupOrg"].(string); org == DefaultImageLookupOrg {
 			instType, _ := spec["instanceType"].(string)
@@ -152,21 +163,27 @@ func (p Provider) EnsureMachineNetwork(ctx context.Context, c client.Client, rea
 	}
 
 	existingSGIDs, filterSGName := inspectAdditionalSecurityGroups(awsMachine)
-	if vpcID == "" || subnetID == "" {
-		discVPC, discSubnet, discErr := DiscoverVPCAndSubnet(ctx, api, clusterName, vpcID, subnetID)
-		if discErr != nil && len(existingSGIDs) == 0 {
-			return discErr
-		}
-		if vpcID == "" {
-			vpcID = discVPC
-		}
-		if subnetID == "" {
-			subnetID = discSubnet
-		}
+	netInfo, discErr := InspectVPCAndSubnet(ctx, api, clusterName, vpcID, subnetID)
+	if discErr != nil && len(existingSGIDs) == 0 && (vpcID == "" || subnetID == "") {
+		return discErr
+	}
+	if vpcID == "" {
+		vpcID = netInfo.VPCID
+	}
+	if subnetID == "" {
+		subnetID = netInfo.SubnetID
 	}
 
 	if machineSubnetID == "" && subnetID != "" {
 		spec["subnet"] = map[string]any{"id": subnetID}
+	}
+	if netInfo.SubnetIPv6CIDR != "" || netInfo.AssignIPv6 {
+		if _, hasAssignV6 := spec["assignPrimaryIPv6"]; !hasAssignV6 {
+			spec["assignPrimaryIPv6"] = "enabled"
+		}
+		if defaultedPublicIP && defaults.PublicIP == nil && !netInfo.MapPublicIPOnLaunch {
+			spec["publicIP"] = false
+		}
 	}
 
 	var managedSGID string
@@ -187,16 +204,24 @@ func (p Provider) EnsureMachineNetwork(ctx context.Context, c client.Client, rea
 
 	if c != nil {
 		origVPC, _, _ := unstructured.NestedString(awsCluster.Object, "spec", "network", "vpc", "id")
+		origVPC6, _, _ := unstructured.NestedString(awsCluster.Object, "spec", "network", "vpc", "ipv6", "cidrBlock")
 		needsClusterPatch := false
 		patched := awsCluster.DeepCopy()
 		if origVPC == "" && vpcID != "" {
 			_ = unstructured.SetNestedField(patched.Object, vpcID, "spec", "network", "vpc", "id")
 			needsClusterPatch = true
 		}
+		if origVPC6 == "" && netInfo.VPCIPv6CIDR != "" {
+			_ = unstructured.SetNestedField(patched.Object, netInfo.VPCIPv6CIDR, "spec", "network", "vpc", "ipv6", "cidrBlock")
+			needsClusterPatch = true
+		}
 		if len(clusterSubnets) == 0 && subnetID != "" {
-			_ = unstructured.SetNestedSlice(patched.Object, []any{
-				map[string]any{"id": subnetID, "resourceID": subnetID, "isPublic": true},
-			}, "spec", "network", "subnets")
+			subEntry := map[string]any{"id": subnetID, "resourceID": subnetID, "isPublic": true}
+			if netInfo.SubnetIPv6CIDR != "" {
+				subEntry["ipv6CidrBlock"] = netInfo.SubnetIPv6CIDR
+				subEntry["isIpv6"] = true
+			}
+			_ = unstructured.SetNestedSlice(patched.Object, []any{subEntry}, "spec", "network", "subnets")
 			needsClusterPatch = true
 		}
 		if managedSGID != "" {
@@ -303,135 +328,203 @@ func inspectAdditionalSecurityGroups(awsMachine *unstructured.Unstructured) (ids
 	return ids, filterGroupName
 }
 
+// NetworkDiscovery holds the discovered or inspected VPC and Subnet metadata,
+// including IPv6 CIDR blocks and public IPv4 launch attributes.
+type NetworkDiscovery struct {
+	VPCID               string
+	VPCIPv6CIDR         string
+	SubnetID            string
+	SubnetIPv6CIDR      string
+	AssignIPv6          bool
+	MapPublicIPOnLaunch bool
+}
+
+type ec2IPv6Association struct {
+	Ipv6CidrBlock      string
+	Ipv6CidrBlockState struct {
+		State string
+	}
+}
+
+func activeIPv6CIDR(assocs []ec2IPv6Association) string {
+	for _, a := range assocs {
+		if strings.TrimSpace(a.Ipv6CidrBlock) == "" {
+			continue
+		}
+		state := strings.ToLower(strings.TrimSpace(a.Ipv6CidrBlockState.State))
+		if state == "" || state == "associated" {
+			return strings.TrimSpace(a.Ipv6CidrBlock)
+		}
+	}
+	return ""
+}
+
+func firstIPv6Subnet64(vpcCIDR string) string {
+	p, err := netip.ParsePrefix(strings.TrimSpace(vpcCIDR))
+	if err != nil || !p.Addr().Is6() || p.Bits() > 64 {
+		return ""
+	}
+	return netip.PrefixFrom(p.Masked().Addr(), 64).String()
+}
+
 // DiscoverVPCAndSubnet discovers the target VPC and public Subnet in EC2 when
-// they are not explicitly set on AWSCluster.spec.network:
-//   - If subnetID is known and vpcID is empty, queries describe-subnets to read
-//     the subnet's VpcId.
+// they are not explicitly set on AWSCluster.spec.network.
+func DiscoverVPCAndSubnet(ctx context.Context, api attachmentaws.API, clusterName, vpcID, subnetID string) (string, string, error) {
+	info, err := InspectVPCAndSubnet(ctx, api, clusterName, vpcID, subnetID)
+	return info.VPCID, info.SubnetID, err
+}
+
+// InspectVPCAndSubnet discovers or inspects the target VPC and Subnet in EC2:
+//   - If subnetID is known, queries describe-subnets to read VpcId, IPv6 CIDR
+//     blocks, AssignIpv6AddressOnCreation, and MapPublicIpOnLaunch.
 //   - If vpcID is empty, queries describe-vpcs and selects:
 //     1. A VPC tagged for clusterName or managed by cloud-provisioning
 //     2. The region's default VPC (IsDefault: true)
 //     3. The sole available VPC in the region
 //   - If subnetID is empty, queries describe-subnets in vpcID and selects:
 //     1. A subnet tagged for clusterName or role=public
-//     2. A public subnet with MapPublicIpOnLaunch=true
-//     3. A default-for-AZ subnet or the first available subnet in the VPC
-func DiscoverVPCAndSubnet(ctx context.Context, api attachmentaws.API, clusterName, vpcID, subnetID string) (string, string, error) {
-	if vpcID == "" && subnetID != "" {
+//     2. An IPv6-enabled subnet (AssignIpv6AddressOnCreation or IPv6 CIDR)
+//     3. A public subnet with MapPublicIpOnLaunch=true
+//     4. A default-for-AZ subnet or the first available subnet in the VPC
+func InspectVPCAndSubnet(ctx context.Context, api attachmentaws.API, clusterName, vpcID, subnetID string) (NetworkDiscovery, error) {
+	info := NetworkDiscovery{
+		VPCID:    strings.TrimSpace(vpcID),
+		SubnetID: strings.TrimSpace(subnetID),
+	}
+
+	type ec2SubnetItem struct {
+		SubnetId                    string
+		VpcId                       string
+		AvailabilityZone            string
+		MapPublicIpOnLaunch         bool
+		AssignIpv6AddressOnCreation bool
+		DefaultForAz                bool
+		State                       string
+		Tags                        []ec2Tag
+		Ipv6CidrBlockAssociationSet []ec2IPv6Association
+	}
+
+	if info.SubnetID != "" {
 		raw, err := api.Call(ctx, "ec2", "describe-subnets", map[string]any{
-			"SubnetIds": []string{subnetID},
+			"SubnetIds": []string{info.SubnetID},
 		})
 		if err == nil && len(raw) > 0 {
 			var subResp struct {
-				Subnets []struct {
-					SubnetId string
-					VpcId    string
-				}
+				Subnets []ec2SubnetItem
 			}
 			if json.Unmarshal(raw, &subResp) == nil && len(subResp.Subnets) > 0 {
-				vpcID = subResp.Subnets[0].VpcId
+				s := subResp.Subnets[0]
+				if info.VPCID == "" {
+					info.VPCID = s.VpcId
+				}
+				info.SubnetIPv6CIDR = activeIPv6CIDR(s.Ipv6CidrBlockAssociationSet)
+				info.AssignIPv6 = s.AssignIpv6AddressOnCreation || info.SubnetIPv6CIDR != ""
+				info.MapPublicIPOnLaunch = s.MapPublicIpOnLaunch
 			}
 		}
 	}
 
-	if vpcID == "" {
+	type ec2VPCItem struct {
+		VpcId                       string
+		IsDefault                   bool
+		State                       string
+		Tags                        []ec2Tag
+		Ipv6CidrBlockAssociationSet []ec2IPv6Association
+	}
+
+	if info.VPCID == "" {
 		raw, err := api.Call(ctx, "ec2", "describe-vpcs", map[string]any{})
 		if err != nil {
-			return "", "", fmt.Errorf("describing VPCs: %w", err)
+			return info, fmt.Errorf("describing VPCs: %w", err)
 		}
 		var vpcResp struct {
-			Vpcs []struct {
-				VpcId     string
-				IsDefault bool
-				State     string
-				Tags      []ec2Tag
-			}
+			Vpcs []ec2VPCItem
 		}
 		if len(raw) > 0 {
 			if err := json.Unmarshal(raw, &vpcResp); err != nil {
-				return "", "", fmt.Errorf("decoding describe-vpcs: %w", err)
+				return info, fmt.Errorf("decoding describe-vpcs: %w", err)
 			}
 		}
-		var available []struct {
-			VpcId     string
-			IsDefault bool
-			State     string
-			Tags      []ec2Tag
-		}
+		var available []ec2VPCItem
 		for _, v := range vpcResp.Vpcs {
 			if v.VpcId != "" && (v.State == "" || v.State == "available") {
 				available = append(available, v)
 			}
 		}
+		var chosen *ec2VPCItem
 		clusterTag := "sigs.k8s.io/cluster-api-provider-aws/cluster/" + clusterName
-		for _, v := range available {
+		for i := range available {
+			v := &available[i]
 			if clusterName != "" && (hasEC2Tag(v.Tags, ClusterTagKey, clusterName) || hasEC2Tag(v.Tags, clusterTag, "")) {
-				vpcID = v.VpcId
+				chosen = v
 				break
 			}
 		}
-		if vpcID == "" {
-			for _, v := range available {
+		if chosen == nil {
+			for i := range available {
+				v := &available[i]
 				if hasEC2Tag(v.Tags, ManagedByTagKey, ManagedByTagValue) {
-					vpcID = v.VpcId
+					chosen = v
 					break
 				}
 			}
 		}
-		if vpcID == "" {
-			for _, v := range available {
+		if chosen == nil {
+			for i := range available {
+				v := &available[i]
 				if v.IsDefault {
-					vpcID = v.VpcId
+					chosen = v
 					break
 				}
 			}
 		}
-		if vpcID == "" && len(available) == 1 {
-			vpcID = available[0].VpcId
+		if chosen == nil && len(available) == 1 {
+			chosen = &available[0]
 		}
-		if vpcID == "" && len(available) > 1 {
-			return "", "", fmt.Errorf("multiple non-default VPCs found in AWS region and none is tagged for cluster %q; set spec.network.vpc.id on AWSCluster or run 'endpoint-controller iam apply --create-vpc'", clusterName)
+		if chosen == nil && len(available) > 1 {
+			return info, fmt.Errorf("multiple non-default VPCs found in AWS region and none is tagged for cluster %q; set spec.network.vpc.id on AWSCluster or run 'endpoint-controller iam apply --create-vpc'", clusterName)
+		}
+		if chosen != nil {
+			info.VPCID = chosen.VpcId
+			info.VPCIPv6CIDR = activeIPv6CIDR(chosen.Ipv6CidrBlockAssociationSet)
+		}
+	} else {
+		raw, err := api.Call(ctx, "ec2", "describe-vpcs", map[string]any{
+			"VpcIds": []string{info.VPCID},
+		})
+		if err == nil && len(raw) > 0 {
+			var vpcResp struct {
+				Vpcs []ec2VPCItem
+			}
+			if json.Unmarshal(raw, &vpcResp) == nil && len(vpcResp.Vpcs) > 0 {
+				info.VPCIPv6CIDR = activeIPv6CIDR(vpcResp.Vpcs[0].Ipv6CidrBlockAssociationSet)
+			}
 		}
 	}
 
-	if subnetID == "" && vpcID != "" {
+	if info.SubnetID == "" && info.VPCID != "" {
 		raw, err := api.Call(ctx, "ec2", "describe-subnets", map[string]any{
 			"Filters": []map[string]any{
-				{"Name": "vpc-id", "Values": []string{vpcID}},
+				{"Name": "vpc-id", "Values": []string{info.VPCID}},
 			},
 		})
 		if err != nil {
-			return vpcID, "", fmt.Errorf("describing subnets in VPC %s: %w", vpcID, err)
+			return info, fmt.Errorf("describing subnets in VPC %s: %w", info.VPCID, err)
 		}
 		var subResp struct {
-			Subnets []struct {
-				SubnetId            string
-				VpcId               string
-				AvailabilityZone    string
-				MapPublicIpOnLaunch bool
-				DefaultForAz        bool
-				State               string
-				Tags                []ec2Tag
-			}
+			Subnets []ec2SubnetItem
 		}
 		if len(raw) > 0 {
 			if err := json.Unmarshal(raw, &subResp); err != nil {
-				return vpcID, "", fmt.Errorf("decoding describe-subnets: %w", err)
+				return info, fmt.Errorf("decoding describe-subnets: %w", err)
 			}
 		}
-		var candidates []struct {
-			SubnetId            string
-			VpcId               string
-			AvailabilityZone    string
-			MapPublicIpOnLaunch bool
-			DefaultForAz        bool
-			State               string
-			Tags                []ec2Tag
-		}
+		var candidates []ec2SubnetItem
 		for _, s := range subResp.Subnets {
 			if s.SubnetId == "" {
 				continue
 			}
-			if s.VpcId != "" && s.VpcId != vpcID {
+			if s.VpcId != "" && s.VpcId != info.VPCID {
 				continue
 			}
 			if s.State != "" && s.State != "available" {
@@ -439,40 +532,60 @@ func DiscoverVPCAndSubnet(ctx context.Context, api attachmentaws.API, clusterNam
 			}
 			candidates = append(candidates, s)
 		}
+		var chosen *ec2SubnetItem
 		clusterTag := "sigs.k8s.io/cluster-api-provider-aws/cluster/" + clusterName
-		for _, s := range candidates {
+		for i := range candidates {
+			s := &candidates[i]
 			if (clusterName != "" && (hasEC2Tag(s.Tags, ClusterTagKey, clusterName) || hasEC2Tag(s.Tags, clusterTag, ""))) ||
 				hasEC2Tag(s.Tags, "sigs.k8s.io/cluster-api-provider-aws/role", "public") {
-				subnetID = s.SubnetId
+				chosen = s
 				break
 			}
 		}
-		if subnetID == "" {
-			for _, s := range candidates {
+		if chosen == nil {
+			for i := range candidates {
+				s := &candidates[i]
+				if s.AssignIpv6AddressOnCreation || activeIPv6CIDR(s.Ipv6CidrBlockAssociationSet) != "" {
+					chosen = s
+					break
+				}
+			}
+		}
+		if chosen == nil {
+			for i := range candidates {
+				s := &candidates[i]
 				if s.MapPublicIpOnLaunch {
-					subnetID = s.SubnetId
+					chosen = s
 					break
 				}
 			}
 		}
-		if subnetID == "" {
-			for _, s := range candidates {
+		if chosen == nil {
+			for i := range candidates {
+				s := &candidates[i]
 				if s.DefaultForAz {
-					subnetID = s.SubnetId
+					chosen = s
 					break
 				}
 			}
 		}
-		if subnetID == "" && len(candidates) > 0 {
-			subnetID = candidates[0].SubnetId
+		if chosen == nil && len(candidates) > 0 {
+			chosen = &candidates[0]
+		}
+		if chosen != nil {
+			info.SubnetID = chosen.SubnetId
+			info.SubnetIPv6CIDR = activeIPv6CIDR(chosen.Ipv6CidrBlockAssociationSet)
+			info.AssignIPv6 = chosen.AssignIpv6AddressOnCreation || info.SubnetIPv6CIDR != ""
+			info.MapPublicIPOnLaunch = chosen.MapPublicIpOnLaunch
 		}
 	}
-	return vpcID, subnetID, nil
+	return info, nil
 }
 
 // EnsureClusterSecurityGroup finds or creates the cluster's WireGuard + pod-mesh
 // Security Group in vpcID and ensures it authorizes:
-//   - UDP 51820 from 0.0.0.0/0 (so on-premises nodes behind NAT can dial the cloud worker)
+//   - UDP 51820 from 0.0.0.0/0 and ::/0 (so on-premises nodes can dial the cloud
+//     worker over either IPv6 or IPv4)
 //   - All protocols (-1) from the security group itself (so pods and nodes in the
 //     security group can communicate directly across the AWS VPC CNI)
 func EnsureClusterSecurityGroup(ctx context.Context, api attachmentaws.API, vpcID, clusterName, sgName string) (string, error) {
@@ -501,6 +614,7 @@ func EnsureClusterSecurityGroup(ctx context.Context, api attachmentaws.API, vpcI
 				FromPort         int
 				ToPort           int
 				IpRanges         []struct{ CidrIp string }
+				Ipv6Ranges       []struct{ CidrIpv6 string }
 				UserIdGroupPairs []struct{ GroupId string }
 			}
 		}
@@ -513,7 +627,8 @@ func EnsureClusterSecurityGroup(ctx context.Context, api attachmentaws.API, vpcI
 	if len(descResp.SecurityGroups) > 0 && descResp.SecurityGroups[0].GroupId != "" {
 		sg := descResp.SecurityGroups[0]
 		hasSelfAll := false
-		hasWireGuard := false
+		hasWireGuardIPv4 := false
+		hasWireGuardIPv6 := false
 		for _, rule := range sg.IpPermissions {
 			if rule.IpProtocol == "-1" {
 				for _, pair := range rule.UserIdGroupPairs {
@@ -523,18 +638,29 @@ func EnsureClusterSecurityGroup(ctx context.Context, api attachmentaws.API, vpcI
 				}
 			}
 			if rule.IpProtocol == "udp" && rule.FromPort <= 51820 && rule.ToPort >= 51820 {
-				hasWireGuard = true
+				if len(rule.IpRanges) > 0 || len(rule.Ipv6Ranges) == 0 {
+					hasWireGuardIPv4 = true
+				}
+				if len(rule.Ipv6Ranges) > 0 {
+					hasWireGuardIPv6 = true
+				}
 			}
 		}
-		if hasEC2Tag(sg.Tags, ManagedByTagKey, ManagedByTagValue) && (!hasSelfAll || !hasWireGuard) {
+		if hasEC2Tag(sg.Tags, ManagedByTagKey, ManagedByTagValue) && (!hasSelfAll || !hasWireGuardIPv4 || !hasWireGuardIPv6) {
 			var missingPerms []map[string]any
-			if !hasWireGuard {
-				missingPerms = append(missingPerms, map[string]any{
+			if !hasWireGuardIPv4 || !hasWireGuardIPv6 {
+				wgPerm := map[string]any{
 					"IpProtocol": "udp",
 					"FromPort":   51820,
 					"ToPort":     51820,
-					"IpRanges":   []map[string]any{{"CidrIp": "0.0.0.0/0", "Description": "WireGuard tunnel from on-premises nodes"}},
-				})
+				}
+				if !hasWireGuardIPv4 {
+					wgPerm["IpRanges"] = []map[string]any{{"CidrIp": "0.0.0.0/0", "Description": "WireGuard tunnel from on-premises nodes (IPv4)"}}
+				}
+				if !hasWireGuardIPv6 {
+					wgPerm["Ipv6Ranges"] = []map[string]any{{"CidrIpv6": "::/0", "Description": "WireGuard tunnel from on-premises nodes (IPv6)"}}
+				}
+				missingPerms = append(missingPerms, wgPerm)
 			}
 			if !hasSelfAll {
 				missingPerms = append(missingPerms, map[string]any{
@@ -584,7 +710,8 @@ func EnsureClusterSecurityGroup(ctx context.Context, api attachmentaws.API, vpcI
 				"IpProtocol": "udp",
 				"FromPort":   51820,
 				"ToPort":     51820,
-				"IpRanges":   []map[string]any{{"CidrIp": "0.0.0.0/0", "Description": "WireGuard tunnel from on-premises nodes"}},
+				"IpRanges":   []map[string]any{{"CidrIp": "0.0.0.0/0", "Description": "WireGuard tunnel from on-premises nodes (IPv4)"}},
+				"Ipv6Ranges": []map[string]any{{"CidrIpv6": "::/0", "Description": "WireGuard tunnel from on-premises nodes (IPv6)"}},
 			},
 			{
 				"IpProtocol":       "-1",
@@ -659,16 +786,20 @@ func CleanupClusterSecurityGroup(ctx context.Context, api attachmentaws.API, vpc
 // and Security Group provisioned or discovered for a cluster.
 type VPCProvisionReport struct {
 	VPCID           string   `json:"vpcId"`
+	VPCIPv6CIDR     string   `json:"vpcIpv6Cidr,omitempty"`
 	SubnetID        string   `json:"subnetId"`
+	SubnetIPv6CIDR  string   `json:"subnetIpv6Cidr,omitempty"`
 	InternetGateway string   `json:"internetGatewayId,omitempty"`
 	RouteTableID    string   `json:"routeTableId,omitempty"`
 	SecurityGroupID string   `json:"securityGroupId"`
 	Changes         []string `json:"changes,omitempty"`
 }
 
-// ProvisionIsolatedVPC idempotently provisions a dedicated tagged VPC, public
-// Subnet, Internet Gateway, Route Table, and WireGuard + pod-mesh Security Group
-// for clusterName when an account lacks a default VPC or desires an isolated VPC.
+// ProvisionIsolatedVPC idempotently provisions a dedicated tagged dual-stack VPC,
+// Subnet (with Amazon-provided IPv6 enabled and MapPublicIpOnLaunch=false to
+// avoid both NAT Gateway and public IPv4 charges), free Internet Gateway, Route
+// Table (routing ::/0 and 0.0.0.0/0 to the Internet Gateway), and WireGuard +
+// pod-mesh Security Group for clusterName.
 func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterName string) (*VPCProvisionReport, error) {
 	if strings.TrimSpace(clusterName) == "" {
 		clusterName = "workers"
@@ -676,7 +807,7 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 	resName := "cloud-provisioning-" + clusterName
 	rep := &VPCProvisionReport{}
 
-	// 1. Find or create VPC
+	// 1. Find or create VPC (with Amazon-provided /56 IPv6 CIDR block)
 	vpcRaw, err := api.Call(ctx, "ec2", "describe-vpcs", map[string]any{
 		"Filters": []map[string]any{
 			{"Name": "tag:" + ManagedByTagKey, "Values": []string{ManagedByTagValue}},
@@ -687,14 +818,19 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 		return nil, fmt.Errorf("describing VPCs for %s: %w", clusterName, err)
 	}
 	var vpcDesc struct {
-		Vpcs []struct{ VpcId string }
+		Vpcs []struct {
+			VpcId                       string
+			Ipv6CidrBlockAssociationSet []ec2IPv6Association
+		}
 	}
 	_ = json.Unmarshal(vpcRaw, &vpcDesc)
 	if len(vpcDesc.Vpcs) > 0 && vpcDesc.Vpcs[0].VpcId != "" {
 		rep.VPCID = vpcDesc.Vpcs[0].VpcId
+		rep.VPCIPv6CIDR = activeIPv6CIDR(vpcDesc.Vpcs[0].Ipv6CidrBlockAssociationSet)
 	} else {
 		createVPCRaw, err := api.Call(ctx, "ec2", "create-vpc", map[string]any{
-			"CidrBlock": DefaultIsolatedVPCCIDR,
+			"CidrBlock":                   DefaultIsolatedVPCCIDR,
+			"AmazonProvidedIpv6CidrBlock": true,
 			"TagSpecifications": []map[string]any{
 				{"ResourceType": "vpc", "Tags": standardResourceTags(clusterName, resName)},
 			},
@@ -703,24 +839,44 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 			return nil, fmt.Errorf("creating VPC for %s: %w", clusterName, err)
 		}
 		var createVPCResp struct {
-			Vpc struct{ VpcId string }
+			Vpc struct {
+				VpcId                       string
+				Ipv6CidrBlockAssociationSet []ec2IPv6Association
+			}
 		}
 		if err := json.Unmarshal(createVPCRaw, &createVPCResp); err != nil || createVPCResp.Vpc.VpcId == "" {
 			return nil, fmt.Errorf("decoding create-vpc response: %w", err)
 		}
 		rep.VPCID = createVPCResp.Vpc.VpcId
+		rep.VPCIPv6CIDR = activeIPv6CIDR(createVPCResp.Vpc.Ipv6CidrBlockAssociationSet)
 		_, _ = api.Call(ctx, "ec2", "modify-vpc-attribute", map[string]any{
-			"VpcId":              rep.VPCID,
-			"EnableDnsSupport":   map[string]any{"Value": true},
+			"VpcId":            rep.VPCID,
+			"EnableDnsSupport": map[string]any{"Value": true},
 		})
 		_, _ = api.Call(ctx, "ec2", "modify-vpc-attribute", map[string]any{
 			"VpcId":              rep.VPCID,
 			"EnableDnsHostnames": map[string]any{"Value": true},
 		})
-		rep.Changes = append(rep.Changes, fmt.Sprintf("created VPC %s (%s)", rep.VPCID, DefaultIsolatedVPCCIDR))
+		rep.Changes = append(rep.Changes, fmt.Sprintf("created dual-stack VPC %s (%s + IPv6)", rep.VPCID, DefaultIsolatedVPCCIDR))
 	}
+	if rep.VPCIPv6CIDR == "" && rep.VPCID != "" {
+		descRaw, err := api.Call(ctx, "ec2", "describe-vpcs", map[string]any{
+			"VpcIds": []string{rep.VPCID},
+		})
+		if err == nil && len(descRaw) > 0 {
+			var d struct {
+				Vpcs []struct {
+					Ipv6CidrBlockAssociationSet []ec2IPv6Association
+				}
+			}
+			if json.Unmarshal(descRaw, &d) == nil && len(d.Vpcs) > 0 {
+				rep.VPCIPv6CIDR = activeIPv6CIDR(d.Vpcs[0].Ipv6CidrBlockAssociationSet)
+			}
+		}
+	}
+	subnetIPv6 := firstIPv6Subnet64(rep.VPCIPv6CIDR)
 
-	// 2. Find or create Internet Gateway and attach to VPC
+	// 2. Find or create Internet Gateway (free; avoids $0.045/hr NAT Gateway) and attach to VPC
 	igwRaw, err := api.Call(ctx, "ec2", "describe-internet-gateways", map[string]any{
 		"Filters": []map[string]any{
 			{"Name": "tag:" + ManagedByTagKey, "Values": []string{ManagedByTagValue}},
@@ -773,7 +929,7 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 		rep.Changes = append(rep.Changes, fmt.Sprintf("attached InternetGateway %s to VPC %s", rep.InternetGateway, rep.VPCID))
 	}
 
-	// 3. Find or create public Subnet
+	// 3. Find or create Subnet (AssignIpv6AddressOnCreation=true, MapPublicIpOnLaunch=false to avoid paid public IPv4s)
 	subRaw, err := api.Call(ctx, "ec2", "describe-subnets", map[string]any{
 		"Filters": []map[string]any{
 			{"Name": "vpc-id", "Values": []string{rep.VPCID}},
@@ -783,22 +939,30 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 		return nil, fmt.Errorf("describing subnets in %s: %w", rep.VPCID, err)
 	}
 	var subDesc struct {
-		Subnets []struct{ SubnetId string }
+		Subnets []struct {
+			SubnetId                    string
+			Ipv6CidrBlockAssociationSet []ec2IPv6Association
+		}
 	}
 	_ = json.Unmarshal(subRaw, &subDesc)
 	if len(subDesc.Subnets) > 0 && subDesc.Subnets[0].SubnetId != "" {
 		rep.SubnetID = subDesc.Subnets[0].SubnetId
+		rep.SubnetIPv6CIDR = activeIPv6CIDR(subDesc.Subnets[0].Ipv6CidrBlockAssociationSet)
 	} else {
 		subTags := append(standardResourceTags(clusterName, resName+"-public"),
 			map[string]any{"Key": "sigs.k8s.io/cluster-api-provider-aws/role", "Value": "public"},
 		)
-		createSubRaw, err := api.Call(ctx, "ec2", "create-subnet", map[string]any{
+		createSubInput := map[string]any{
 			"VpcId":     rep.VPCID,
 			"CidrBlock": DefaultIsolatedSubnetCIDR,
 			"TagSpecifications": []map[string]any{
 				{"ResourceType": "subnet", "Tags": subTags},
 			},
-		})
+		}
+		if subnetIPv6 != "" {
+			createSubInput["Ipv6CidrBlock"] = subnetIPv6
+		}
+		createSubRaw, err := api.Call(ctx, "ec2", "create-subnet", createSubInput)
 		if err != nil {
 			return nil, fmt.Errorf("creating public subnet in %s: %w", rep.VPCID, err)
 		}
@@ -809,14 +973,19 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 			return nil, fmt.Errorf("decoding create-subnet: %w", err)
 		}
 		rep.SubnetID = createSubResp.Subnet.SubnetId
+		rep.SubnetIPv6CIDR = subnetIPv6
+		_, _ = api.Call(ctx, "ec2", "modify-subnet-attribute", map[string]any{
+			"SubnetId":                    rep.SubnetID,
+			"AssignIpv6AddressOnCreation": map[string]any{"Value": true},
+		})
 		_, _ = api.Call(ctx, "ec2", "modify-subnet-attribute", map[string]any{
 			"SubnetId":            rep.SubnetID,
-			"MapPublicIpOnLaunch": map[string]any{"Value": true},
+			"MapPublicIpOnLaunch": map[string]any{"Value": false},
 		})
-		rep.Changes = append(rep.Changes, fmt.Sprintf("created public Subnet %s (%s)", rep.SubnetID, DefaultIsolatedSubnetCIDR))
+		rep.Changes = append(rep.Changes, fmt.Sprintf("created IPv6-enabled Subnet %s (%s, MapPublicIpOnLaunch=false)", rep.SubnetID, DefaultIsolatedSubnetCIDR))
 	}
 
-	// 4. Find or create public Route Table and default route to Internet Gateway
+	// 4. Find or create Route Table and default IPv4 + IPv6 routes to Internet Gateway
 	rtRaw, err := api.Call(ctx, "ec2", "describe-route-tables", map[string]any{
 		"Filters": []map[string]any{
 			{"Name": "vpc-id", "Values": []string{rep.VPCID}},
@@ -830,16 +999,19 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 		RouteTables []struct {
 			RouteTableId string
 			Associations []struct{ SubnetId string }
-			Routes       []struct{ DestinationCidrBlock, GatewayId string }
+			Routes       []struct{ DestinationCidrBlock, DestinationIpv6CidrBlock, GatewayId string }
 		}
 	}
 	_ = json.Unmarshal(rtRaw, &rtDesc)
-	var hasDefaultRoute, hasAssociation bool
+	var hasDefaultRoute, hasDefaultIPv6Route, hasAssociation bool
 	if len(rtDesc.RouteTables) > 0 && rtDesc.RouteTables[0].RouteTableId != "" {
 		rep.RouteTableID = rtDesc.RouteTables[0].RouteTableId
 		for _, r := range rtDesc.RouteTables[0].Routes {
 			if r.DestinationCidrBlock == "0.0.0.0/0" && r.GatewayId == rep.InternetGateway {
 				hasDefaultRoute = true
+			}
+			if r.DestinationIpv6CidrBlock == "::/0" && r.GatewayId == rep.InternetGateway {
+				hasDefaultIPv6Route = true
 			}
 		}
 		for _, a := range rtDesc.RouteTables[0].Associations {
@@ -875,6 +1047,16 @@ func ProvisionIsolatedVPC(ctx context.Context, api attachmentaws.API, clusterNam
 			return nil, fmt.Errorf("creating default route in %s: %w", rep.RouteTableID, err)
 		}
 		rep.Changes = append(rep.Changes, fmt.Sprintf("created route 0.0.0.0/0 -> %s in %s", rep.InternetGateway, rep.RouteTableID))
+	}
+	if !hasDefaultIPv6Route {
+		if _, err := api.Call(ctx, "ec2", "create-route", map[string]any{
+			"RouteTableId":             rep.RouteTableID,
+			"DestinationIpv6CidrBlock": "::/0",
+			"GatewayId":                rep.InternetGateway,
+		}); err != nil {
+			return nil, fmt.Errorf("creating default IPv6 route in %s: %w", rep.RouteTableID, err)
+		}
+		rep.Changes = append(rep.Changes, fmt.Sprintf("created route ::/0 -> %s in %s", rep.InternetGateway, rep.RouteTableID))
 	}
 	if !hasAssociation {
 		if _, err := api.Call(ctx, "ec2", "associate-route-table", map[string]any{

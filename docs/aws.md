@@ -74,25 +74,35 @@ Before applying worker claims, configure:
     uses [controller.json](iam/controller.json) to discover VPCs/subnets,
     automatically create and delete the cluster's `cloud-provisioning-<cluster>`
     security group, and observe AWS VPC CNI pod IP allocations.
-- **How VPC, Subnet, and Security Group selection works**:
-  Because `AWSCluster` carries `cluster.x-k8s.io/managed-by: external` (so CAPA
-  does not provision a cloud control-plane load balancer or NAT Gateways),
-  **CAPA's `AWSCluster` controller stands down and does not pick a VPC, subnet,
-  or security group automatically**. Instead, `cloud-provisioning` resolves them:
-  1. **VPC & Public Subnet**: Uses `AWSCluster.spec.network.vpc.id` and
-     `AWSCluster.spec.network.subnets` when explicitly set; otherwise queries
-     EC2 for a VPC tagged for the cluster (`--create-vpc`), the region's default
-     VPC (`isDefault: true`), or the sole VPC in the region, selects a public
-     subnet (`mapPublicIpOnLaunch: true`), and patches `AWSCluster.spec.network`
-     and `AWSMachine.spec.subnet`.
+- **How VPC, Subnet, and Security Group selection works (avoiding NAT Gateways & Public IPv4s)**:
+  Because `AWSCluster` carries `cluster.x-k8s.io/managed-by: external`, **CAPA's
+  `AWSCluster` controller stands down and never provisions an AWS NAT Gateway
+  ($0.045/hr + per-GB) or Elastic Load Balancer**. Instead, `cloud-provisioning`
+  resolves them automatically:
+  1. **VPC & Subnet (Zero NAT Gateway + Zero Public IPv4 via IPv6)**:
+     - Uses `AWSCluster.spec.network.vpc.id` and `AWSCluster.spec.network.subnets`
+       when explicitly set; otherwise queries EC2 for a VPC tagged for the
+       cluster (`--create-vpc`), the region's default VPC (`isDefault: true`),
+       or the sole VPC in the region, prefers an IPv6-enabled subnet
+       (`assignIpv6AddressOnCreation: true`) before falling back to an IPv4
+       public subnet, and patches `AWSCluster.spec.network` and `AWSMachine.spec.subnet`.
+     - `endpoint-controller iam apply --create-vpc` creates a dual-stack VPC
+       with an Amazon-provided `/56` IPv6 CIDR, a `/64` IPv6 subnet
+       (`assignIpv6AddressOnCreation: true`, `mapPublicIpOnLaunch: false`), and
+       a free Internet Gateway (`::/0` and `0.0.0.0/0` routes — no NAT Gateway).
+     - On an IPv6 subnet with `mapPublicIpOnLaunch: false` (or when
+       `assignPrimaryIPv6: enabled` / `publicIP: false` is set), the controller
+       automatically sets `assignPrimaryIPv6: enabled` and `publicIP: false` on
+       `AWSMachine` and dials the worker's free globally routable IPv6 address
+       (`[2600:...]:51820`), avoiding AWS's $0.005/hr per-IPv4 charge.
   2. **Security Group (automatic creation & teardown when unused)**: Because AWS
      Security Groups (`sg-...`) are VPC-scoped, a static default ID cannot exist.
      When `AWSMachineTemplate` omits `additionalSecurityGroups`, the controller
      automatically creates `cloud-provisioning-<cluster>` in the resolved VPC
      (tagged `cloud-provisioning.appmana.com/managed-by=cloud-provisioning`),
-     authorizes inbound `UDP 51820` (`0.0.0.0/0` for WireGuard from on-premises)
-     and all-protocol (`-1`) self-ingress (for node/pod mesh traffic), and
-     attaches its `sg-...` ID to the `AWSMachine`. When the last
+     authorizes inbound `UDP 51820` (`::/0` and `0.0.0.0/0` for WireGuard from
+     on-premises) and all-protocol (`-1`) self-ingress (for node/pod mesh
+     traffic), and attaches its `sg-...` ID to the `AWSMachine`. When the last
      `ProvisionedNodeClaim` in the cluster is deleted, the controller
      automatically deletes the security group once the instances terminate.
 

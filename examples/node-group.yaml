@@ -98,13 +98,14 @@ spec:
         cloud-provisioning.appmana.com/cni: site
     spec:
       instanceType: t3.large
-      # Why `publicIP: true` is required (and defaulted by the admission webhook):
-      # The on-premises cluster sits behind NAT/firewalls with no public control-plane
-      # endpoint and no inbound ports open. On-premises WireGuard dialers initiate
-      # outbound UDP 51820 connections to the cloud worker's public IP; once the
-      # WireGuard handshake completes, all Kubernetes API and pod traffic flows
-      # inside the encrypted tunnel.
-      publicIP: true
+      # Avoiding both AWS NAT Gateways ($0.045/hr) and Public IPv4s ($0.005/hr):
+      # - On an IPv6-enabled subnet (such as one created by `iam apply --create-vpc`),
+      #   the controller automatically sets `assignPrimaryIPv6: enabled` and
+      #   `publicIP: false`, dialing the worker's free global IPv6 address over the
+      #   free Internet Gateway.
+      # - In an IPv4-only subnet without IPv6, `publicIP` defaults to `true` so
+      #   on-premises WireGuard dialers behind NAT can reach UDP 51820 over the
+      #   free Internet Gateway without needing a NAT Gateway.
 ---
 # --- ProvisionedNodeGroupClaim (shortName: pngc) ---
 # Maintains a replica set of ProvisionedNodeClaims:

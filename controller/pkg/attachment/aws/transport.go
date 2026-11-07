@@ -53,6 +53,8 @@ func (t *EC2Transport) Call(ctx context.Context, service, operation string, inpu
 		return sdkCall(ctx, input, t.client.DeleteVpc)
 	case "modify-vpc-attribute":
 		return sdkCall(ctx, input, t.client.ModifyVpcAttribute)
+	case "associate-vpc-cidr-block":
+		return sdkCall(ctx, input, t.client.AssociateVpcCidrBlock)
 	case "describe-availability-zones":
 		return sdkCall(ctx, input, t.client.DescribeAvailabilityZones)
 	case "create-subnet":
@@ -61,6 +63,8 @@ func (t *EC2Transport) Call(ctx context.Context, service, operation string, inpu
 		return sdkCall(ctx, input, t.client.DeleteSubnet)
 	case "modify-subnet-attribute":
 		return sdkCall(ctx, input, t.client.ModifySubnetAttribute)
+	case "associate-subnet-cidr-block":
+		return sdkCall(ctx, input, t.client.AssociateSubnetCidrBlock)
 	case "create-internet-gateway":
 		return sdkCall(ctx, input, t.client.CreateInternetGateway)
 	case "describe-internet-gateways":

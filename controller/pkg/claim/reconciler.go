@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -892,19 +893,28 @@ func nodeClassStatus(c platform.Class) v1alpha1.NodeClass {
 
 func externalIPOf(machine *unstructured.Unstructured) string {
 	addresses, _, _ := unstructured.NestedSlice(machine.Object, "status", "addresses")
+	var globalInternal string
 	for _, entry := range addresses {
 		address, ok := entry.(map[string]any)
 		if !ok {
 			continue
 		}
-		if address["type"] != "ExternalIP" {
+		ipStr, _ := address["address"].(string)
+		if ipStr == "" {
 			continue
 		}
-		if ip, ok := address["address"].(string); ok && ip != "" {
-			return ip
+		switch address["type"] {
+		case "ExternalIP":
+			return ipStr
+		case "InternalIP":
+			if globalInternal == "" {
+				if ip := net.ParseIP(ipStr); ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() {
+					globalInternal = ip.String()
+				}
+			}
 		}
 	}
-	return ""
+	return globalInternal
 }
 
 // MachineListGVK is exported for the endpoint-controller's watch

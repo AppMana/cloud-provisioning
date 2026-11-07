@@ -169,6 +169,9 @@ spec:
             {{- with .Values.webhook.aws.sshKeyName }}
             - {{ printf "--webhook-aws-ssh-key-name=%s" . | quote }}
             {{- end }}
+            {{- if not (eq (toString .Values.webhook.aws.publicIP) "") }}
+            - {{ printf "--webhook-aws-public-ip=%v" .Values.webhook.aws.publicIP | quote }}
+            {{- end }}
             {{- with .Values.webhook.aws.identityName }}
             - {{ printf "--webhook-aws-identity-name=%s" . | quote }}
             {{- end }}

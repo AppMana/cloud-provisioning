@@ -473,13 +473,15 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 }
 
 // machineHosts reads a Machine's status.addresses: the address the
-// tunnel dials (its first ExternalIP, else its first InternalIP) and
-// every address of its own to accept and route on its peer entry, the
-// dialled one first and then each InternalIP, the Node's own addresses
-// that the API server and the network address it by. Names are not
-// addresses and are skipped.
+// tunnel dials (its first ExternalIP, else its first globally routable
+// unicast InternalIP such as an AWS IPv6 GUA when publicIP: false, else
+// its first InternalIP) and every address of its own to accept and route
+// on its peer entry, the dialled one first and then each InternalIP, the
+// Node's own addresses that the API server and the network address it by.
+// Names are not addresses and are skipped.
 func machineHosts(addresses []any) (string, []string) {
 	var external string
+	var globalInternal string
 	var internal []string
 	for _, entry := range addresses {
 		address, ok := entry.(map[string]any)
@@ -498,9 +500,15 @@ func machineHosts(addresses []any) (string, []string) {
 			}
 		case "InternalIP":
 			internal = append(internal, ip.String())
+			if globalInternal == "" && ip.IsGlobalUnicast() && !ip.IsPrivate() {
+				globalInternal = ip.String()
+			}
 		}
 	}
 	endpoint := external
+	if endpoint == "" {
+		endpoint = globalInternal
+	}
 	if endpoint == "" && len(internal) > 0 {
 		endpoint = internal[0]
 	}
@@ -671,6 +679,7 @@ func main() {
 	webhookAWSSecurityGroupName := flag.String("webhook-aws-security-group-name", "", "optional AWS security group name filter automatically patched into AWSMachineTemplate/AWSMachine for on-premises WireGuard connections")
 	webhookAWSIAMInstanceProfile := flag.String("webhook-aws-iam-instance-profile", "", "optional default EC2 IAM instance profile name for AWSMachineTemplate/AWSMachine")
 	webhookAWSSSHKeyName := flag.String("webhook-aws-ssh-key-name", "", "optional default EC2 SSH keypair name for AWSMachineTemplate/AWSMachine")
+	webhookAWSPublicIP := flag.String("webhook-aws-public-ip", "", "optional default AWSMachine.spec.publicIP ('true' or 'false'); when empty, IPv6 subnets default to false and IPv4-only subnets default to true")
 	webhookAWSIdentityName := flag.String("webhook-aws-identity-name", "", "optional default AWSClusterStaticIdentity or AWSClusterRoleIdentity name for AWSCluster")
 	webhookGCPNetworkTag := flag.String("webhook-gcp-network-tag", "", "optional GCE network tag automatically patched into GCPMachineTemplate/GCPMachine for the WireGuard firewall rule")
 	vpcCNIFamily := flag.String("aws-vpc-cni-family", "ipv4", "the AWS VPC CNI's pod address family, ipv4 or ipv6")
@@ -925,6 +934,15 @@ func main() {
 			configuredSGIDs = append(configuredSGIDs, id)
 		}
 	}
+	var configuredPublicIP *bool
+	switch strings.ToLower(strings.TrimSpace(*webhookAWSPublicIP)) {
+	case "true", "1", "yes":
+		v := true
+		configuredPublicIP = &v
+	case "false", "0", "no":
+		v := false
+		configuredPublicIP = &v
+	}
 	awsProvider := joinaws.Provider{
 		ConfigNamespace:    awsConfigNamespace,
 		ConfigName:         awsConfigName,
@@ -933,6 +951,7 @@ func main() {
 		SecurityGroupName:  strings.TrimSpace(*webhookAWSSecurityGroupName),
 		IAMInstanceProfile: strings.TrimSpace(*webhookAWSIAMInstanceProfile),
 		SSHKeyName:         strings.TrimSpace(*webhookAWSSSHKeyName),
+		PublicIP:           configuredPublicIP,
 		EC2:                awsSDK.API,
 		WindowsIPAM:        *vpcCNI && *windowsIPAMImage != "",
 	}

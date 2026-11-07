@@ -41,6 +41,7 @@ type AWSSpecDefaults struct {
 	SubnetID           string
 	AMIAMD64           string
 	AMIARM64           string
+	PublicIP           *bool
 }
 
 // Provider reads/renders unstructured CAPA objects rather than
@@ -75,6 +76,7 @@ type Provider struct {
 	SecurityGroupName  string
 	IAMInstanceProfile string
 	SSHKeyName         string
+	PublicIP           *bool
 	// EC2 is an EC2 API in a region, for checks before a machine exists.
 	EC2 func(ctx context.Context, region string) (attachmentaws.API, error)
 	// WindowsIPAM is whether the cluster runs Windows IPAM, which Windows
@@ -117,6 +119,7 @@ func (p Provider) ConfigDefaults(ctx context.Context) AWSSpecDefaults {
 		SecurityGroupName:  strings.TrimSpace(p.SecurityGroupName),
 		IAMInstanceProfile: strings.TrimSpace(p.IAMInstanceProfile),
 		SSHKeyName:         strings.TrimSpace(p.SSHKeyName),
+		PublicIP:           p.PublicIP,
 	}
 	if p.Reader == nil || strings.TrimSpace(p.ConfigNamespace) == "" || strings.TrimSpace(p.ConfigName) == "" {
 		return out
@@ -144,6 +147,16 @@ func (p Provider) ConfigDefaults(ctx context.Context) AWSSpecDefaults {
 	}
 	if out.SSHKeyName == "" {
 		out.SSHKeyName = readKey("ssh-key-name")
+	}
+	if out.PublicIP == nil {
+		switch strings.ToLower(readKey("public-ip")) {
+		case "true", "1", "yes":
+			v := true
+			out.PublicIP = &v
+		case "false", "0", "no":
+			v := false
+			out.PublicIP = &v
+		}
 	}
 	out.VPCID = readKey("vpc-id")
 	out.SubnetID = readKey("subnet-id")
@@ -173,6 +186,14 @@ func (p Provider) PrepareInfraMachine(awsMachine *unstructured.Unstructured) (st
 		spec = map[string]any{}
 		awsMachine.Object["spec"] = spec
 	}
+	if _, explicit := spec["publicIP"]; !explicit {
+		anns := awsMachine.GetAnnotations()
+		if anns == nil {
+			anns = map[string]string{}
+		}
+		anns["cloud-provisioning.appmana.com/defaulted-public-ip"] = "true"
+		awsMachine.SetAnnotations(anns)
+	}
 	arch := awsMachine.GetLabels()["cloud-provisioning.appmana.com/arch"]
 	if err := PrepareAWSMachineSpec(spec, arch, p.ConfigDefaults(context.Background())); err != nil {
 		return "", err
@@ -194,7 +215,13 @@ func PrepareAWSMachineSpec(spec map[string]any, archLabel string, defaults AWSSp
 		return nil
 	}
 	if _, found := spec["publicIP"]; !found {
-		spec["publicIP"] = true
+		if defaults.PublicIP != nil {
+			spec["publicIP"] = *defaults.PublicIP
+		} else if assignV6, _ := spec["assignPrimaryIPv6"].(string); strings.EqualFold(strings.TrimSpace(assignV6), "enabled") {
+			spec["publicIP"] = false
+		} else {
+			spec["publicIP"] = true
+		}
 	}
 	if profile, _ := spec["iamInstanceProfile"].(string); strings.TrimSpace(profile) == "" {
 		if defaults.IAMInstanceProfile != "" {

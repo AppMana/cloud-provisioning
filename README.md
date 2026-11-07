@@ -119,33 +119,47 @@ endpoint-controller iam cleanup \
   --kubeconfig="$KUBECONFIG"
 ```
 
-### How VPC, Subnet, and Security Group Selection Works
+### How VPC, Subnet, and Security Group Selection Works (Zero NAT Gateway & Zero Public IPv4)
 
-Because `AWSCluster` carries `cluster.x-k8s.io/managed-by: external` (so CAPA
-does not create a cloud control-plane ELB or NAT Gateways), **CAPA's
-`AWSCluster` controller stands down and does not pick a VPC, subnet, or
-security group automatically**. Instead, `cloud-provisioning` resolves and
-manages them automatically:
+Because `AWSCluster` carries `cluster.x-k8s.io/managed-by: external`, **CAPA's
+`AWSCluster` controller stands down and never creates an AWS NAT Gateway
+($0.045/hr + per-GB) or Elastic Load Balancer**. Instead, `cloud-provisioning`
+resolves networking automatically and supports **zero-public-IPv4 ($0.005/hr
+per IP saved)** operation over AWS's free Internet Gateway (`igw-...`):
 
-1. **VPC & Public Subnet**:
+1. **VPC & Subnet (with Free IPv6 + Internet Gateway)**:
    - **Automatic discovery (default)**: When `AWSCluster.spec.network` is
      omitted, the controller queries EC2 `DescribeVpcs` and `DescribeSubnets`,
-     selects a VPC tagged for the cluster (created by `--create-vpc`) or the
-     region's default VPC (`isDefault: true`) and a public subnet
-     (`mapPublicIpOnLaunch: true`), and patches `AWSCluster.spec.network` and
-     `AWSMachine.spec.subnet`.
-   - **Explicit VPC / Subnet**: To use a specific existing VPC or subnet, set
-     `spec.network.vpc.id` and `spec.network.subnets` on `AWSCluster` (or
-     `spec.template.spec.subnet.id` on `AWSMachineTemplate`).
+     selects a VPC tagged for the cluster (`--create-vpc`) or the region's
+     default VPC (`isDefault: true`), prefers an IPv6-enabled subnet
+     (`assignIpv6AddressOnCreation: true`) before falling back to an IPv4
+     public subnet, and patches `AWSCluster.spec.network` (including VPC/subnet
+     IPv6 CIDRs when present) and `AWSMachine.spec.subnet`.
+   - **Avoiding both NAT Gateways and Public IPv4s**:
+     - Running `endpoint-controller iam apply --create-vpc` creates a dedicated
+       dual-stack VPC with an Amazon-provided `/56` IPv6 CIDR, a `/64` IPv6
+       subnet (`assignIpv6AddressOnCreation: true`, `mapPublicIpOnLaunch: false`),
+       and a free Internet Gateway (`::/0` and `0.0.0.0/0` routes — **never a
+       NAT Gateway**).
+     - On any IPv6-enabled subnet (or when `assignPrimaryIPv6: enabled` /
+       `publicIP: false` is set), the controller automatically sets
+       `assignPrimaryIPv6: enabled` and `publicIP: false` on `AWSMachine` and
+       dials the worker's free globally routable IPv6 address (`[2600:...]:51820`)
+       directly.
+     - `publicIP: true` is only used as a fallback when the AWS subnet has no
+       IPv6 CIDR and `publicIP` is not set to `false`.
+   - **Explicit VPC / Subnet**: Set `spec.network.vpc.id` and
+     `spec.network.subnets` on `AWSCluster` (or `spec.template.spec.subnet.id`
+     on `AWSMachineTemplate`) to pin a specific existing VPC or subnet.
 2. **Security Group (automatic creation & teardown when unused)**:
    - Because AWS Security Groups (`sg-...`) are VPC-scoped, a static default ID
      cannot exist across accounts or VPCs.
    - When `AWSMachineTemplate` omits `additionalSecurityGroups`, the controller
      automatically creates `cloud-provisioning-<cluster>` in the resolved VPC
      (tagged `cloud-provisioning.appmana.com/managed-by=cloud-provisioning`),
-     authorizes inbound `UDP 51820` (`0.0.0.0/0` for WireGuard from on-premises)
-     and all-protocol (`-1`) self-ingress (for node/pod mesh traffic), and
-     attaches its `sg-...` ID to each `AWSMachine`.
+     authorizes inbound `UDP 51820` (`::/0` and `0.0.0.0/0` for WireGuard from
+     on-premises) and all-protocol (`-1`) self-ingress (for node/pod mesh
+     traffic), and attaches its `sg-...` ID to each `AWSMachine`.
    - When the last `ProvisionedNodeClaim` in the cluster is deleted (or a
      `ProvisionedNodeGroupClaim` scales to `0`), the controller automatically
      deletes the security group once the instances terminate.
@@ -234,13 +248,13 @@ spec:
         cloud-provisioning.appmana.com/cni: site
     spec:
       instanceType: t3.large
-      # Why `publicIP: true` is required (and defaulted by the admission webhook):
-      # The on-premises cluster is private (behind NAT/firewalls with no inbound
-      # ports open and no public control-plane endpoint). On-premises WireGuard
-      # dialers initiate outbound UDP 51820 connections to the cloud worker's
-      # public IP; once the tunnel handshake completes, all Kubernetes API and
-      # pod traffic flows inside the encrypted tunnel.
-      publicIP: true
+      # Avoiding both AWS NAT Gateways ($0.045/hr) and Public IPv4s ($0.005/hr):
+      # - On an IPv6-enabled subnet (such as one created by `iam apply --create-vpc`),
+      #   the controller automatically sets `assignPrimaryIPv6: enabled` and
+      #   `publicIP: false`, dialing the worker's free global IPv6 address over the
+      #   free Internet Gateway.
+      # - You can also set `assignPrimaryIPv6: enabled` and `publicIP: false`
+      #   explicitly, or leave both omitted to auto-detect from the subnet.
 ---
 # --- Option A: Single Cloud Worker Node (ProvisionedNodeClaim) ---
 apiVersion: cloud-provisioning.appmana.com/v1alpha1

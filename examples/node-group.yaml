@@ -1,0 +1,151 @@
+# ProvisionedNodeGroupClaim: a ReplicaSet of cloud worker nodes.
+#
+# Enable in HelmRelease values with:
+#   experimentalNodeGroups: true
+#
+# --- How AWS Credentials & Permissions Work ---
+# Two components talk to AWS when using CAPA:
+#
+# 1. CAPA controller (capa-controller-manager in namespace capa-system):
+#    Launches and terminates EC2 instances for AWSMachines.
+#    - Create a Secret in `capa-system` (CAPA always resolves secretRef in its
+#      own manager namespace, `capa-system`), referenced by an
+#      AWSClusterStaticIdentity (or use AWSClusterRoleIdentity to assume a role
+#      from that static identity so sessions auto-renew).
+#
+# 2. cloud-provisioning endpoint-controller (in namespace cloud-provisioning):
+#    Validates security groups before machine creation, signs s3:// bootstrap
+#    URLs (if used), and observes native AWS VPC CNI pod IP allocations.
+#    - In HelmRelease values, set `aws.credentials.secretName: aws-credentials`
+#      (a Secret in `cloud-provisioning` with keys AWS_ACCESS_KEY_ID,
+#      AWS_SECRET_ACCESS_KEY, AWS_REGION) and `providerManagerNamespace: capa-system`
+#      so preflight checks can verify the CAPA Secret in `capa-system` exists.
+#    - Optional: set `aws.iamBootstrap.enabled: true` in HelmRelease values to
+#      automatically create/update the required IAM roles, instance profiles,
+#      and policies at install/upgrade time.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aws-capa-credentials
+  namespace: capa-system # Must live in CAPA's manager namespace (capa-system)
+type: Opaque
+stringData:
+  AccessKeyID: AKIAIOSFODNN7EXAMPLE
+  SecretAccessKey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterStaticIdentity
+metadata:
+  name: site-aws-identity
+spec:
+  secretRef: aws-capa-credentials # Resolved in capa-system
+  allowedNamespaces:
+    list:
+      - cloud-provisioning
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSCluster
+metadata:
+  name: site-aws
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  region: us-west-2
+  identityRef:
+    kind: AWSClusterStaticIdentity
+    name: site-aws-identity
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: site-aws
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSCluster
+    name: site-aws
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: aws-ubuntu-amd64
+  namespace: cloud-provisioning
+spec:
+  template:
+    metadata:
+      labels:
+        cloud-provisioning.appmana.com/os: linux
+        cloud-provisioning.appmana.com/arch: amd64
+        cloud-provisioning.appmana.com/cni: site
+    spec:
+      instanceType: t3.large
+      iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
+      ami:
+        id: ami-0abcdef1234567890
+      subnet:
+        id: subnet-0123456789abcdef0
+      additionalSecurityGroups:
+        - id: sg-0123456789abcdef0 # Must allow inbound UDP 51820 from on-prem
+      publicIP: true
+---
+# --- ProvisionedNodeGroupClaim (shortName: pngc) ---
+# Maintains a replica set of ProvisionedNodeClaims:
+# - Scaling up creates deterministic child claims (<group>-<uid-hash>-<ordinal>).
+# - Scaling down cordons and drains the highest-ordinal Node via the Kubernetes
+#   Eviction API, withdraws its WireGuard peer from the mesh, and deletes the
+#   child ProvisionedNodeClaim and cloud instance.
+# - Each joined Node is automatically labeled with:
+#     cloud-provisioning.appmana.com/node-group-uid: <metadata.uid of this group>
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeGroupClaim
+metadata:
+  name: aws-worker-pool
+  namespace: cloud-provisioning
+spec:
+  # Desired number of cloud worker nodes in this group (can also be scaled via
+  # `kubectl scale pngc aws-worker-pool --replicas=5` or KEDA/HPA):
+  replicas: 3
+
+  # workloadSelector (optional): label selector identifying the workload Pods
+  # that run on this node group. Exposed as `.status.selector` on the
+  # Kubernetes `/scale` subresource (`subresources.scale.labelSelectorPath`),
+  # which Kubernetes autoscalers (HPA / KEDA) read when scaling a custom
+  # resource via `/scale`.
+  workloadSelector:
+    matchLabels:
+      app: batch-worker
+
+  # Template for each child ProvisionedNodeClaim created by this group:
+  template:
+    spec:
+      clusterName: site-aws
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: AWSMachineTemplate
+        name: aws-ubuntu-amd64
+---
+# Optional: KEDA ScaledObject autoscaling the ProvisionedNodeGroupClaim via its
+# /scale subresource (scales from 0 to 10 cloud worker nodes based on queue depth):
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: aws-worker-pool-scaler
+  namespace: cloud-provisioning
+spec:
+  scaleTargetRef:
+    apiVersion: cloud-provisioning.appmana.com/v1alpha1
+    kind: ProvisionedNodeGroupClaim
+    name: aws-worker-pool
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  cooldownPeriod: 300
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        query: sum(batch_jobs_queued)
+        threshold: "4" # 1 cloud worker node per 4 queued jobs

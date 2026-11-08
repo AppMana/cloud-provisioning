@@ -1,9 +1,10 @@
 // Package webhook implements the mutating admission webhook that simplifies
 // setting up Cluster API and cloud-provisioning resources for hybrid clusters:
 //   - AWSMachineTemplate & AWSMachine: automatically patches in the security
-//     group needed for on-premises WireGuard connections, defaults publicIP: true,
-//     iamInstanceProfile, cloudInit.insecureSkipSecretsManager: true, and
-//     Canonical's official Ubuntu 24.04 LTS AMI lookup when ami/subnet are omitted.
+//     group needed for on-premises WireGuard connections, defaults publicIP: false
+//     and assignPrimaryIPv6: "enabled" (avoiding both NAT Gateways and public IPv4
+//     charges), iamInstanceProfile, cloudInit.insecureSkipSecretsManager: true,
+//     and Canonical's official Ubuntu 24.04 LTS AMI lookup when ami/subnet are omitted.
 //   - GCPMachineTemplate & GCPMachine: defaults publicIP: true, official Ubuntu
 //     24.04 LTS imageFamily, the Debian/RHEL startup-script cloud-init bridge,
 //     and optional GCE firewall network tag.

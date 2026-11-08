@@ -136,18 +136,17 @@ per IP saved)** operation over AWS's free Internet Gateway (`igw-...`):
      public subnet, and patches `AWSCluster.spec.network` (including VPC/subnet
      IPv6 CIDRs when present) and `AWSMachine.spec.subnet`.
    - **Avoiding both NAT Gateways and Public IPv4s**:
+     - **Zero NAT Gateway & Zero Public IPv4 by default**: By default,
+       `AWSMachineTemplate` / `AWSMachine` defaults to `publicIP: false` and
+       `assignPrimaryIPv6: enabled`, dialing the worker's free globally routable
+       IPv6 address (`[2600:...]:51820`) over the free Internet Gateway.
      - Running `endpoint-controller iam apply --create-vpc` creates a dedicated
        dual-stack VPC with an Amazon-provided `/56` IPv6 CIDR, a `/64` IPv6
        subnet (`assignIpv6AddressOnCreation: true`, `mapPublicIpOnLaunch: false`),
        and a free Internet Gateway (`::/0` and `0.0.0.0/0` routes — **never a
        NAT Gateway**).
-     - On any IPv6-enabled subnet (or when `assignPrimaryIPv6: enabled` /
-       `publicIP: false` is set), the controller automatically sets
-       `assignPrimaryIPv6: enabled` and `publicIP: false` on `AWSMachine` and
-       dials the worker's free globally routable IPv6 address (`[2600:...]:51820`)
-       directly.
-     - `publicIP: true` is only used as a fallback when the AWS subnet has no
-       IPv6 CIDR and `publicIP` is not set to `false`.
+     - Only set `publicIP: true` on a template when you explicitly need an IPv4
+       address (for example, a `replicas: 1` IPv4 ingress/gateway node group).
    - **Explicit VPC / Subnet**: Set `spec.network.vpc.id` and
      `spec.network.subnets` on `AWSCluster` (or `spec.template.spec.subnet.id`
      on `AWSMachineTemplate`) to pin a specific existing VPC or subnet.
@@ -227,11 +226,13 @@ spec:
     kind: AWSCluster
     name: site-aws
 ---
-# No AMI ID, subnet ID, or security group ID is needed:
+# --- Template 1: IPv6 Worker Template (Default — Zero NAT Gateway, Zero Public IPv4) ---
+# - `publicIP: false` and `assignPrimaryIPv6: enabled` are the defaults when omitted:
+#   workers use free global AWS IPv6 addresses over the VPC's free Internet Gateway.
 # - Security group (`cloud-provisioning-site-aws`) is created in the VPC when the
 #   first node is claimed and deleted automatically when the last node is removed.
 # - `ami` defaults to Canonical's official Ubuntu 24.04 LTS AMI lookup (`099720109477`).
-# - `subnet` is populated automatically from the discovered or configured VPC public subnet.
+# - `subnet` is populated automatically from the discovered or configured VPC subnet.
 # - `iamInstanceProfile` defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
@@ -248,27 +249,29 @@ spec:
         cloud-provisioning.appmana.com/cni: site
     spec:
       instanceType: t3.large
-      # Avoiding both AWS NAT Gateways ($0.045/hr) and Public IPv4s ($0.005/hr):
-      # - On an IPv6-enabled subnet (such as one created by `iam apply --create-vpc`),
-      #   the controller automatically sets `assignPrimaryIPv6: enabled` and
-      #   `publicIP: false`, dialing the worker's free global IPv6 address over the
-      #   free Internet Gateway.
-      # - You can also set `assignPrimaryIPv6: enabled` and `publicIP: false`
-      #   explicitly, or leave both omitted to auto-detect from the subnet.
 ---
-# --- Option A: Single Cloud Worker Node (ProvisionedNodeClaim) ---
-apiVersion: cloud-provisioning.appmana.com/v1alpha1
-kind: ProvisionedNodeClaim
+# --- Template 2: IPv4 Template (Opt-In When Public IPv4 Is Explicitly Needed) ---
+# Set `publicIP: true` only when you need a public IPv4 address (e.g. for a 1-replica
+# IPv4 HTTP/HTTPS ingress or gateway group):
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
 metadata:
-  name: aws-worker-1
+  name: aws-ubuntu-ipv4
   namespace: cloud-provisioning
 spec:
-  infrastructureRef:
-    kind: AWSMachineTemplate
-    name: aws-ubuntu-amd64
+  template:
+    metadata:
+      labels:
+        cloud-provisioning.appmana.com/os: linux
+        cloud-provisioning.appmana.com/arch: amd64
+        cloud-provisioning.appmana.com/cni: site
+    spec:
+      instanceType: t3.small
+      publicIP: true
 ---
-# --- Option B: ReplicaSet of Cloud Worker Nodes (ProvisionedNodeGroupClaim / pngc) ---
-# Maintains `spec.replicas` child ProvisionedNodeClaims (<group>-<uid-hash>-<ordinal>).
+# --- Group 1: IPv6 Worker Pool (ProvisionedNodeGroupClaim / pngc, replicas: 3) ---
+# Maintains `spec.replicas` child ProvisionedNodeClaims (<group>-<uid-hash>-<ordinal>)
+# with zero NAT Gateway and zero public IPv4 cost.
 # Scaling up provisions new cloud nodes; scaling down cordons and drains the
 # highest-ordinal Node via the Eviction API, withdraws its WireGuard peer, and
 # terminates the cloud instance (and deletes the security group when scaled to 0).
@@ -292,6 +295,22 @@ spec:
       infrastructureRef:
         kind: AWSMachineTemplate
         name: aws-ubuntu-amd64
+---
+# --- Group 2: Single IPv4 Gateway / Ingress Node (replicas: 1) ---
+# Keeps a single public-IPv4 node (`publicIP: true`) when IPv4 connectivity/ingress
+# is required, while the main worker pool (`aws-worker-pool`) scales on free IPv6:
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeGroupClaim
+metadata:
+  name: aws-ipv4-gateway
+  namespace: cloud-provisioning
+spec:
+  replicas: 1
+  template:
+    spec:
+      infrastructureRef:
+        kind: AWSMachineTemplate
+        name: aws-ubuntu-ipv4
 ```
 
 ### Multi-Cloud in the Same Cluster

@@ -72,17 +72,16 @@ spec:
     kind: AWSCluster
     name: site-aws
 ---
-# No hardcoded AMI ID, subnet ID, or security group ID is needed in the template:
+# --- Template 1: IPv6 Worker Template (Default — Zero NAT Gateway, Zero Public IPv4) ---
+# - `publicIP: false` and `assignPrimaryIPv6: enabled` are the defaults when
+#   omitted: workers use free global AWS IPv6 addresses over the VPC's free
+#   Internet Gateway (`igw-...`), paying $0 for NAT Gateways and $0 for public IPv4s.
 # - `additionalSecurityGroups`: when omitted, the controller automatically creates
 #   a VPC-scoped security group (`cloud-provisioning-site-aws`) in the cluster's VPC
-#   authorizing inbound UDP 51820 (WireGuard) and self-ingress (`-1` for pod mesh),
-#   and tears it down automatically when the last node claim in the cluster is deleted.
-# - `ami`: defaults automatically to Canonical's official Ubuntu 24.04 LTS AMI
-#   lookup (`099720109477` / `ubuntu-noble-24.04`) matching `amd64` or `arm64`.
-# - `subnet`: when omitted on both `AWSCluster` and `AWSMachineTemplate`, the
-#   controller discovers the cluster-tagged or default VPC and public subnet
-#   automatically (because CAPA's AWSCluster controller stands down on
-#   `managed-by: external` clusters and does not pick a VPC/subnet itself).
+#   authorizing inbound UDP 51820 (::/0 and 0.0.0.0/0) and self-ingress (`-1` for
+#   pod mesh), and tears it down automatically when the last claim is deleted.
+# - `ami`: defaults to Canonical's official Ubuntu 24.04 LTS AMI lookup (`099720109477`).
+# - `subnet`: discovered and patched automatically from the cluster/default VPC.
 # - `iamInstanceProfile`: defaults to `nodes.cluster-api-provider-aws.sigs.k8s.io`.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
@@ -98,16 +97,28 @@ spec:
         cloud-provisioning.appmana.com/cni: site
     spec:
       instanceType: t3.large
-      # Avoiding both AWS NAT Gateways ($0.045/hr) and Public IPv4s ($0.005/hr):
-      # - On an IPv6-enabled subnet (such as one created by `iam apply --create-vpc`),
-      #   the controller automatically sets `assignPrimaryIPv6: enabled` and
-      #   `publicIP: false`, dialing the worker's free global IPv6 address over the
-      #   free Internet Gateway.
-      # - In an IPv4-only subnet without IPv6, `publicIP` defaults to `true` so
-      #   on-premises WireGuard dialers behind NAT can reach UDP 51820 over the
-      #   free Internet Gateway without needing a NAT Gateway.
 ---
-# --- ProvisionedNodeGroupClaim (shortName: pngc) ---
+# --- Template 2: IPv4 Template (Opt-In When Public IPv4 Is Explicitly Needed) ---
+# Set `publicIP: true` only on a small gateway/ingress template when you need a
+# public IPv4 address (e.g. for legacy IPv4 HTTP/HTTPS ingress on ports 80/443 or
+# an IPv4-only site).
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: aws-ubuntu-ipv4
+  namespace: cloud-provisioning
+spec:
+  template:
+    metadata:
+      labels:
+        cloud-provisioning.appmana.com/os: linux
+        cloud-provisioning.appmana.com/arch: amd64
+        cloud-provisioning.appmana.com/cni: site
+    spec:
+      instanceType: t3.small
+      publicIP: true
+---
+# --- Group 1: IPv6 Worker Pool (replicas: 3, Zero Public IPv4 Cost) ---
 # Maintains a replica set of ProvisionedNodeClaims:
 # - Scaling up creates deterministic child claims (<group>-<uid-hash>-<ordinal>).
 # - Scaling down cordons and drains the highest-ordinal Node via the Kubernetes
@@ -121,8 +132,8 @@ metadata:
   name: aws-worker-pool
   namespace: cloud-provisioning
 spec:
-  # Desired number of cloud worker nodes in this group (can also be scaled via
-  # `kubectl scale pngc aws-worker-pool --replicas=5` or KEDA/HPA):
+  # Desired number of IPv6 cloud worker nodes in this group (can also be scaled
+  # via `kubectl scale pngc aws-worker-pool --replicas=5` or KEDA/HPA):
   replicas: 3
 
   # workloadSelector (optional): label selector identifying the workload Pods
@@ -142,6 +153,24 @@ spec:
         apiGroup: infrastructure.cluster.x-k8s.io
         kind: AWSMachineTemplate
         name: aws-ubuntu-amd64
+---
+# --- Group 2: Single IPv4 Gateway / Ingress Node (replicas: 1) ---
+# Keeps a single public-IPv4 node (`publicIP: true`) when IPv4 ingress/connectivity
+# is needed, while the main worker pool (`aws-worker-pool`) scales on free IPv6:
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeGroupClaim
+metadata:
+  name: aws-ipv4-gateway
+  namespace: cloud-provisioning
+spec:
+  replicas: 1
+  template:
+    spec:
+      clusterName: site-aws
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: AWSMachineTemplate
+        name: aws-ubuntu-ipv4
 ---
 # Optional: KEDA ScaledObject autoscaling the ProvisionedNodeGroupClaim via its
 # /scale subresource (scales from 0 to 10 cloud worker nodes based on queue depth):

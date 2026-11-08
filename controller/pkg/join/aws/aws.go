@@ -186,14 +186,6 @@ func (p Provider) PrepareInfraMachine(awsMachine *unstructured.Unstructured) (st
 		spec = map[string]any{}
 		awsMachine.Object["spec"] = spec
 	}
-	if _, explicit := spec["publicIP"]; !explicit {
-		anns := awsMachine.GetAnnotations()
-		if anns == nil {
-			anns = map[string]string{}
-		}
-		anns["cloud-provisioning.appmana.com/defaulted-public-ip"] = "true"
-		awsMachine.SetAnnotations(anns)
-	}
 	arch := awsMachine.GetLabels()["cloud-provisioning.appmana.com/arch"]
 	if err := PrepareAWSMachineSpec(spec, arch, p.ConfigDefaults(context.Background())); err != nil {
 		return "", err
@@ -203,8 +195,10 @@ func (p Provider) PrepareInfraMachine(awsMachine *unstructured.Unstructured) (st
 
 // PrepareAWSMachineSpec populates safe defaults on an AWSMachine spec (or
 // AWSMachineTemplate.spec.template.spec) when fields are omitted:
-//   - publicIP: true (on-premises WireGuard dialers behind NAT initiate outbound
-//     UDP 51820 to the cloud worker's public IP)
+//   - publicIP: false and assignPrimaryIPv6: "enabled" (avoids both AWS NAT
+//     Gateways and $0.005/hr public IPv4 charges by routing free global IPv6
+//     over the VPC's free Internet Gateway; users who explicitly need IPv4 set
+//     publicIP: true on their template)
 //   - iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
 //   - cloudInit.insecureSkipSecretsManager: true
 //   - additionalSecurityGroups: appends configured WireGuard security group IDs/filters
@@ -217,10 +211,13 @@ func PrepareAWSMachineSpec(spec map[string]any, archLabel string, defaults AWSSp
 	if _, found := spec["publicIP"]; !found {
 		if defaults.PublicIP != nil {
 			spec["publicIP"] = *defaults.PublicIP
-		} else if assignV6, _ := spec["assignPrimaryIPv6"].(string); strings.EqualFold(strings.TrimSpace(assignV6), "enabled") {
-			spec["publicIP"] = false
 		} else {
-			spec["publicIP"] = true
+			spec["publicIP"] = false
+		}
+	}
+	if _, found := spec["assignPrimaryIPv6"]; !found {
+		if pub, _ := spec["publicIP"].(bool); !pub {
+			spec["assignPrimaryIPv6"] = "enabled"
 		}
 	}
 	if profile, _ := spec["iamInstanceProfile"].(string); strings.TrimSpace(profile) == "" {

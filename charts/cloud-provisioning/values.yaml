@@ -411,9 +411,8 @@ webhook:
     iamInstanceProfile: ""
     sshKeyName: ""
     # Optional default for AWSMachine.spec.publicIP ("true" or "false").
-    # When empty, IPv6-enabled subnets default to publicIP: false +
-    # assignPrimaryIPv6: enabled (avoiding both NAT Gateway and public IPv4
-    # charges), and IPv4-only subnets default to publicIP: true.
+    # When empty, AWSMachineTemplate/AWSMachine defaults to publicIP: false and
+    # assignPrimaryIPv6: enabled (avoiding both NAT Gateway and public IPv4 charges).
     publicIP: ""
     identityName: ""
   gcp:

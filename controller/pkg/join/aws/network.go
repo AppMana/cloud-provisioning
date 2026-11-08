@@ -94,16 +94,6 @@ func (p Provider) EnsureMachineNetwork(ctx context.Context, c client.Client, rea
 		awsMachine.Object["spec"] = spec
 	}
 	arch := awsMachine.GetLabels()["cloud-provisioning.appmana.com/arch"]
-	_, hasPublicIP := spec["publicIP"]
-	defaultedPublicIP := !hasPublicIP || awsMachine.GetAnnotations()["cloud-provisioning.appmana.com/defaulted-public-ip"] == "true"
-	if anns := awsMachine.GetAnnotations(); anns["cloud-provisioning.appmana.com/defaulted-public-ip"] != "" {
-		delete(anns, "cloud-provisioning.appmana.com/defaulted-public-ip")
-		if len(anns) == 0 {
-			awsMachine.SetAnnotations(nil)
-		} else {
-			awsMachine.SetAnnotations(anns)
-		}
-	}
 	if defaults.AMIAMD64 != "" || defaults.AMIARM64 != "" {
 		if org, _ := spec["imageLookupOrg"].(string); org == DefaultImageLookupOrg {
 			instType, _ := spec["instanceType"].(string)
@@ -180,9 +170,6 @@ func (p Provider) EnsureMachineNetwork(ctx context.Context, c client.Client, rea
 	if netInfo.SubnetIPv6CIDR != "" || netInfo.AssignIPv6 {
 		if _, hasAssignV6 := spec["assignPrimaryIPv6"]; !hasAssignV6 {
 			spec["assignPrimaryIPv6"] = "enabled"
-		}
-		if defaultedPublicIP && defaults.PublicIP == nil && !netInfo.MapPublicIPOnLaunch {
-			spec["publicIP"] = false
 		}
 	}
 

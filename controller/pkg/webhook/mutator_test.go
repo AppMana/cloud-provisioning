@@ -130,8 +130,11 @@ func TestMutator_AWSMachineTemplatePatchesSecurityGroupAMIAndPublicIP(t *testing
 	patched := applyPatchOps(t, rawObj, outReview.Response.Patch)
 	spec, _, _ := unstructured.NestedMap(patched, "spec", "template", "spec")
 
-	if pub, _ := spec["publicIP"].(bool); !pub {
-		t.Fatalf("publicIP = %v, want true", spec["publicIP"])
+	if pub, found := spec["publicIP"].(bool); !found || pub {
+		t.Fatalf("publicIP = %v (found=%v), want false by default to avoid public IPv4 charges", spec["publicIP"], found)
+	}
+	if assignV6, _ := spec["assignPrimaryIPv6"].(string); assignV6 != "enabled" {
+		t.Fatalf("assignPrimaryIPv6 = %q, want enabled by default", assignV6)
 	}
 	if prof, _ := spec["iamInstanceProfile"].(string); prof != joinaws.DefaultIAMInstanceProfile {
 		t.Fatalf("iamInstanceProfile = %q, want %q", prof, joinaws.DefaultIAMInstanceProfile)
@@ -148,6 +151,36 @@ func TestMutator_AWSMachineTemplatePatchesSecurityGroupAMIAndPublicIP(t *testing
 	sgs, _ := spec["additionalSecurityGroups"].([]any)
 	if len(sgs) != 2 {
 		t.Fatalf("additionalSecurityGroups = %+v, want 2 entries (ID + filter)", sgs)
+	}
+
+	// An explicit IPv4 template (publicIP: true) must preserve publicIP: true.
+	ipv4Obj := map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "AWSMachineTemplate",
+		"metadata": map[string]any{
+			"name":      "aws-ipv4-gateway",
+			"namespace": "cloud-provisioning",
+		},
+		"spec": map[string]any{
+			"template": map[string]any{
+				"spec": map[string]any{
+					"instanceType": "t3.small",
+					"publicIP":     true,
+				},
+			},
+		},
+	}
+	ipv4Bytes, _ := json.Marshal(ipv4Obj)
+	ipv4Resp := mut.Admit(context.Background(), &admissionv1.AdmissionRequest{
+		UID:       "req-ipv4",
+		Kind:      metav1.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: "AWSMachineTemplate"},
+		Namespace: "cloud-provisioning",
+		Object:    runtime.RawExtension{Raw: ipv4Bytes},
+	})
+	patchedIPv4 := applyPatchOps(t, ipv4Obj, ipv4Resp.Patch)
+	ipv4Spec, _, _ := unstructured.NestedMap(patchedIPv4, "spec", "template", "spec")
+	if pub, _ := ipv4Spec["publicIP"].(bool); !pub {
+		t.Fatalf("explicit IPv4 template publicIP = %v, want true", ipv4Spec["publicIP"])
 	}
 }
 

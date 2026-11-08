@@ -61,7 +61,7 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 	}
 
 	var initObjs []client.Object
-	var group *v1alpha1.ProvisionedNodeGroupClaim
+	var groups []*v1alpha1.ProvisionedNodeGroupClaim
 	for _, doc := range strings.Split(string(raw), "\n---") {
 		var u unstructured.Unstructured
 		if err := yaml.Unmarshal([]byte(doc), &u.Object); err != nil {
@@ -90,16 +90,16 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 			if err := yaml.Unmarshal([]byte(doc), &g); err != nil {
 				t.Fatalf("unmarshaling ProvisionedNodeGroupClaim: %v", err)
 			}
-			g.UID = "uid-aws-worker-pool"
+			g.UID = types.UID("uid-" + g.Name)
 			g.Generation = 1
 			initObjs = append(initObjs, &g)
-			group = &g
+			groups = append(groups, &g)
 		default:
 			initObjs = append(initObjs, &u)
 		}
 	}
-	if group == nil {
-		t.Fatal("expected ProvisionedNodeGroupClaim in examples/node-group.yaml")
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 ProvisionedNodeGroupClaims (IPv6 pool + IPv4 gateway) in examples/node-group.yaml, got %d", len(groups))
 	}
 
 	initObjs = append(initObjs, &corev1.Node{
@@ -135,43 +135,35 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: group.Namespace, Name: group.Name}}
-	for step := 0; step < 15; step++ {
-		if _, err := ngReconciler.Reconcile(ctx, req); err != nil {
-			t.Fatalf("nodegroup Reconcile step %d: %v", step, err)
-		}
-		var children v1alpha1.ProvisionedNodeClaimList
-		if err := c.List(ctx, &children, client.InNamespace(group.Namespace)); err != nil {
-			t.Fatal(err)
-		}
-		for i := range children.Items {
-			ch := &children.Items[i]
-			if ch.UID == "" {
-				ch.UID = types.UID("uid-" + ch.Name)
-				if err := c.Update(ctx, ch); err != nil {
-					t.Fatal(err)
-				}
+	for _, group := range groups {
+		req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: group.Namespace, Name: group.Name}}
+		for step := 0; step < 15; step++ {
+			if _, err := ngReconciler.Reconcile(ctx, req); err != nil {
+				t.Fatalf("nodegroup Reconcile(%s) step %d: %v", group.Name, step, err)
 			}
 		}
 	}
 
-	var updatedGroup v1alpha1.ProvisionedNodeGroupClaim
-	if err := c.Get(ctx, req.NamespacedName, &updatedGroup); err != nil {
+	var ipv6Group, ipv4Group v1alpha1.ProvisionedNodeGroupClaim
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "cloud-provisioning", Name: "aws-worker-pool"}, &ipv6Group); err != nil {
 		t.Fatal(err)
 	}
-	if updatedGroup.Status.Replicas != 3 {
-		t.Fatalf("Status.Replicas = %d, want 3", updatedGroup.Status.Replicas)
+	if ipv6Group.Status.Replicas != 3 || ipv6Group.Status.Selector != "app=batch-worker" {
+		t.Fatalf("aws-worker-pool Status = %+v, want Replicas=3 Selector=app=batch-worker", ipv6Group.Status)
 	}
-	if updatedGroup.Status.Selector != "app=batch-worker" {
-		t.Fatalf("Status.Selector = %q, want \"app=batch-worker\"", updatedGroup.Status.Selector)
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "cloud-provisioning", Name: "aws-ipv4-gateway"}, &ipv4Group); err != nil {
+		t.Fatal(err)
+	}
+	if ipv4Group.Status.Replicas != 1 {
+		t.Fatalf("aws-ipv4-gateway Status.Replicas = %d, want 1", ipv4Group.Status.Replicas)
 	}
 
 	var children v1alpha1.ProvisionedNodeClaimList
-	if err := c.List(ctx, &children, client.InNamespace(group.Namespace)); err != nil {
+	if err := c.List(ctx, &children, client.InNamespace("cloud-provisioning")); err != nil {
 		t.Fatal(err)
 	}
-	if len(children.Items) != 3 {
-		t.Fatalf("child ProvisionedNodeClaim count = %d, want 3", len(children.Items))
+	if len(children.Items) != 4 {
+		t.Fatalf("child ProvisionedNodeClaim count = %d, want 4 (3 IPv6 + 1 IPv4)", len(children.Items))
 	}
 
 	awsProv := joinaws.Provider{
@@ -188,6 +180,8 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 		BootstrapSecretNameFormat: "%s-bootstrap",
 		TunnelInterface:           "cldt0",
 	}
+	ipv6Count := 0
+	ipv4Count := 0
 	for i := range children.Items {
 		ch := &children.Items[i]
 		if _, err := claimReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(ch)}); err != nil {
@@ -205,6 +199,22 @@ func TestExamplesNodeGroupManifest(t *testing.T) {
 		if len(sgs) != 1 {
 			t.Fatalf("%s additionalSecurityGroups = %v, want 1 auto-provisioned security group", ch.Name, sgs)
 		}
+		pubIP, _, _ := unstructured.NestedBool(awsMachine.Object, "spec", "publicIP")
+		assignV6, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "assignPrimaryIPv6")
+		if strings.HasPrefix(ch.Name, "aws-worker-pool-") {
+			if pubIP || assignV6 != "enabled" {
+				t.Fatalf("%s: publicIP=%v assignPrimaryIPv6=%q, want publicIP=false assignPrimaryIPv6=enabled", ch.Name, pubIP, assignV6)
+			}
+			ipv6Count++
+		} else if strings.HasPrefix(ch.Name, "aws-ipv4-gateway-") {
+			if !pubIP {
+				t.Fatalf("%s: publicIP=%v, want true for explicit IPv4 group", ch.Name, pubIP)
+			}
+			ipv4Count++
+		}
+	}
+	if ipv6Count != 3 || ipv4Count != 1 {
+		t.Fatalf("ipv6Count=%d ipv4Count=%d, want 3 and 1", ipv6Count, ipv4Count)
 	}
 }
 
